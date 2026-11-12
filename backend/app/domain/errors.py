@@ -69,6 +69,10 @@ class OverlappingVersionError(DomainError):
     code = "OVERLAPPING_VERSION"
 
 
+class InvalidChangeReasonError(DomainError):
+    code = "INVALID_CHANGE_REASON"
+
+
 class InvalidEmployeeIdentityError(DomainError):
     code = "INVALID_EMPLOYEE_IDENTITY"
 
