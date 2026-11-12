@@ -82,3 +82,6 @@ jobs:
 
       - name: Test
         run: pytest --cov --cov-report=term-missing
+
+      - name: Domain coverage (must be 100%)
+        run: pytest tests/domain --cov=app/domain --cov-branch --cov-fail-under=100
