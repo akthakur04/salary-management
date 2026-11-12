@@ -9,6 +9,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  commits:
+    name: Commit messages (Conventional Commits)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install commitizen
+        run: pip install "commitizen>=4.19,<5"
+
+      - name: Check every commit in the pull request
+        run: cz check -l 72 --rev-range "origin/${{ github.base_ref }}..HEAD"
+
+  hooks:
+    name: Pre-commit hooks (hygiene, ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Install pre-commit
+        run: pip install "pre-commit>=4"
+
+      - name: Run hooks on all files
+        # main is protected on GitHub; this hook only guards local commits.
+        env:
+          SKIP: no-commit-to-branch
+        run: pre-commit run --all-files --show-diff-on-failure
+
   backend:
     name: Backend (lint, types, tests)
     runs-on: ubuntu-latest

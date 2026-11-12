@@ -1,0 +1,42 @@
+# Commit message rules (Conventional Commits 1.0.0). See CONTRIBUTING.md.
+# Checked by the commit-msg hook locally and by CI on every pull request.
+#
+# The first-line limit (72) is passed as `-l 72` by the hook and CI:
+# commitizen 4.19 ignores `message_length_limit` from config files.
+[tool.commitizen]
+name = "cz_customize"
+
+[tool.commitizen.customize]
+# type(scope)!: description
+#  - type from the Conventional Commits list
+#  - optional lowercase scope
+#  - description starts lowercase (imperative verb) and has no full stop
+#  - optional body and footers after a blank line
+schema_pattern = '(?s)(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9-]+\))?!?: [a-z0-9`][^\n]*[^.\n](\n\n.*)?\s*$'
+schema = "<type>(<scope>): <description>\n\n<body>\n\n<footer>"
+example = "feat(domain): reject overlapping compensation versions"
+info = "Conventional Commits 1.0.0. See CONTRIBUTING.md."
+message_template = "{{change_type}}: {{message}}"
+
+[[tool.commitizen.customize.questions]]
+type = "list"
+name = "change_type"
+message = "Type of change"
+choices = [
+    { value = "feat", name = "feat: a new behaviour" },
+    { value = "fix", name = "fix: a bug fix" },
+    { value = "test", name = "test: tests only" },
+    { value = "refactor", name = "refactor: no behaviour change" },
+    { value = "perf", name = "perf: performance" },
+    { value = "docs", name = "docs: documentation only" },
+    { value = "style", name = "style: formatting only" },
+    { value = "build", name = "build: build system or dependencies" },
+    { value = "ci", name = "ci: CI configuration" },
+    { value = "chore", name = "chore: maintenance" },
+    { value = "revert", name = "revert: revert a commit" },
+]
+
+[[tool.commitizen.customize.questions]]
+type = "input"
+name = "message"
+message = "Description (imperative, lowercase, no full stop)"
