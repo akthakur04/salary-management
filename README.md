@@ -2,7 +2,7 @@
 
 Salary management for an HR Manager looking after 10,000 employees across 8 countries: full salary packages (base, allowances, bonus, commission, one-time payments), effective-dated history, pay bands, and insights into how the organisation pays people.
 
-> **Status:** in progress. The backend foundation is in place; the domain, persistence, seed, API and frontend follow phase by phase.
+> **Status:** in progress. The backend foundation and the domain layer (all salary rules, edge cases E1–E25) are in place; persistence, seed, API and frontend follow phase by phase.
 
 ## Docs
 
