@@ -90,6 +90,8 @@ These follow from the docs or from the kick-off answers, but the docs didn't spe
 | Compa-ratio is rounded to two decimals; raise % and variable share to one | Matches the design (0.89, +9.1%). |
 | USD always has rate 1 | USD per USD is 1 by definition, so the rate set doesn't need it. |
 
+**Candidate's decision on review:** the AI asked whether moves to another country (E18) should get their own reason, rather than borrowing `market_adjustment`. The candidate chose to **add `transfer`**, so the reasons are hire, promotion, merit, market adjustment, transfer and correction.
+
 ### Corrections during the phase
 
 - **Ruff import order:** the pre-commit ruff hook, run from the repo root, sorted `app` imports as third-party, the opposite of ruff run from `backend/`. The fix pins `app` and `tests` as first-party. The hook also caught two compound `assert`s and a `zip` that should be `pairwise`.

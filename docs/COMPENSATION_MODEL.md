@@ -74,7 +74,7 @@ Rounding: calculate in minor units and round half-to-even once, at the end. Comp
 | E15 | Backdated correction | Allowed with reason `correction` when dated on or after the start of the latest version. On that version's own start date it supersedes it, and the superseded version stays in history with a zero-length period. A correction dated between two existing versions is **rejected** with `OVERLAPPING_VERSION`, because earlier periods are kept as recorded. |
 | E16 | Overlapping effective periods | **Rejected** by the domain layer. |
 | E17 | Promotion (role change + raise) | New version under the new role; the band comparison switches to the new band. |
-| E18 | Transfer to another country | New version in the new currency; history keeps the old currency figures as they were. |
+| E18 | Transfer to another country | New version with reason `transfer`, in the new country's currency; history keeps the old currency figures as they were. |
 | E19 | Raise % between versions | Calculated in local currency (not USD) so FX doesn't distort it. |
 
 ### Validation
