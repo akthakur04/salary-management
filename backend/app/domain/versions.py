@@ -38,6 +38,7 @@ class ChangeReason(StrEnum):
     PROMOTION = "promotion"
     MERIT = "merit"
     MARKET_ADJUSTMENT = "market_adjustment"
+    TRANSFER = "transfer"
     CORRECTION = "correction"
 
 
