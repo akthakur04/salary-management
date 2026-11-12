@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overview · ACME Salary</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8F7F4}
+a{color:#3B46A0}a:hover{color:#2C3580}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; font-family: Geist, Inter, system-ui, sans-serif; color: #16181D; background: #F8F7F4">
+  <nav aria-label="Main" style="flex: 1 1 232px; max-width: 100%; box-sizing: border-box; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #E5E3DD; background: #FFFFFF">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px">
+      <div style="width: 28px; height: 28px; border-radius: 7px; background: #3B46A0; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"><path d="M4 19V9"></path><path d="M10 19V5"></path><path d="M16 19v-7"></path><path d="M22 19H2"></path></svg></div>
+      <span style="font-size: 15px; font-weight: 600">ACME Salary</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Overview.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; background: #EEF0FA; color: #2C3580; font-size: 14px; font-weight: 600; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="12" width="7" height="9" rx="1.5"></rect><rect x="3" y="16" width="7" height="5" rx="1.5"></rect></svg>Overview</a>
+      <a href="Employees.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7"></path><path d="M18 14a6.5 6.5 0 0 1 3.5 6"></path></svg>Employees</a>
+      <a href="Insights.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-6"></path><path d="M22 20H2"></path></svg>Insights</a>
+      <a href="Exceptions.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg><span style="flex: 1">Exceptions</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #FBF1DE; color: #7A4E06">749</span></a>
+    </div>
+    <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px; border-top: 1px solid #E5E3DD">
+      <div aria-hidden="true" style="width: 32px; height: 32px; border-radius: 999px; background: #E7F0EA; color: #3E6A51; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600">MI</div>
+      <div style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 600">Meera Iyer</span><span style="font-size: 12px; color: #5C6370">HR Manager</span></div>
+      <a href="Main.dc.html" style="font-size: 12px; color: #5C6370">Sign out</a>
+    </div>
+  </nav>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 32px; border-bottom: 1px solid #E5E3DD; background: #FFFFFF">
+      <label for="search" style="flex: 1 1 320px; max-width: 520px; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #E5E3DD; border-radius: 10px; background: #F8F7F4; color: #5C6370"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg><input id="search" placeholder="Search employees by name or ID" aria-label="Search employees" style="flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 14px; color: #16181D; outline: none"><kbd style="font-family: 'Geist Mono', monospace; font-size: 11px; padding: 2px 6px; border: 1px solid #D9D6CE; border-radius: 6px; background: #FFFFFF">⌘K</kbd></label>
+      <span style="margin-left: auto; font-size: 13px; color: #5C6370">Figures as of <b style="color: #16181D; font-weight: 600">12 Nov 2026</b> · USD at reference rates</span>
+    </header>
+    <main style="padding: 32px; display: flex; flex-direction: column; gap: 24px; max-width: 1280px; box-sizing: border-box; width: 100%">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.015em">Good morning, Meera</h1>
+          <p style="margin: 0; font-size: 14px; color: #5C6370">Here's how ACME pays its people today, and what needs your attention.</p>
+        </div>
+        <a href="Employees.dc.html" style="display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; background: #3B46A0; color: #FFFFFF; font-size: 14px; font-weight: 600; text-decoration: none">+ Add employee</a>
+      </div>
+      <section aria-label="Key figures" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px">
+        <div style="padding: 20px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; color: #5C6370">Active headcount</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 32px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.02em">9,512</span>
+          <span style="font-size: 12px; color: #5C6370">+48 joiners, −21 leavers this quarter</span>
+        </div>
+        <div style="padding: 20px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; color: #5C6370">Total annual pay (target)</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 32px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.02em">$812.4M</span>
+          <span style="font-size: 12px; color: #5C6370">Base + allowances + target variable</span>
+        </div>
+        <div style="padding: 20px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; color: #5C6370">Median total pay</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 32px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.02em">$71,300</span>
+          <span style="font-size: 12px; color: #5C6370">Across all countries, in USD</span>
+        </div>
+        <div style="padding: 20px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; color: #5C6370">Paid within band</span>
+          <span style="font-family: 'Geist Mono', monospace; font-size: 32px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.02em">92.1%</span>
+          <div aria-hidden="true" style="display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: #EFEDE7"><div style="width: 5.5%; background: #B07A1E"></div><div style="width: 92.1%; background: #4F7D63"></div><div style="width: 2.4%; background: #6B5FA8"></div></div>
+        </div>
+      </section>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px">
+        <section aria-labelledby="attn" style="padding: 24px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px">
+          <div style="display: flex; justify-content: space-between; align-items: center"><h2 id="attn" style="margin: 0; font-size: 16px; font-weight: 600">Needs your attention</h2><a href="Exceptions.dc.html" style="font-size: 13px">View all</a></div>
+          <a href="Exceptions.dc.html" style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #F1E3C4; border-radius: 10px; background: #FFFBF2; color: #16181D; text-decoration: none">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 22px; min-width: 56px; color: #7A4E06">486</span>
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Paid below band</span><span style="font-size: 13px; color: #5C6370">Most in Engineering · India (73) and Support · Brazil (41)</span></span>
+            <span aria-hidden="true" style="color: #5C6370">→</span>
+          </a>
+          <a href="Exceptions.dc.html" style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #E5E3DD; border-radius: 10px; color: #16181D; text-decoration: none">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 22px; min-width: 56px; color: #3B46A0">37</span>
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Changes taking effect soon</span><span style="font-size: 13px; color: #5C6370">Scheduled raises and promotions in the next 60 days</span></span>
+            <span aria-hidden="true" style="color: #5C6370">→</span>
+          </a>
+          <a href="Exceptions.dc.html" style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #E5E3DD; border-radius: 10px; color: #16181D; text-decoration: none">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 22px; min-width: 56px; color: #54473F">214</span>
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Paid above band</span><span style="font-size: 13px; color: #5C6370">Worth a look, not necessarily a problem</span></span>
+            <span aria-hidden="true" style="color: #5C6370">→</span>
+          </a>
+          <a href="Exceptions.dc.html" style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #E5E3DD; border-radius: 10px; color: #16181D; text-decoration: none">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 22px; min-width: 56px; color: #8F2F27">12</span>
+            <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Missing a salary package</span><span style="font-size: 13px; color: #5C6370">Excluded from averages until added</span></span>
+            <span aria-hidden="true" style="color: #5C6370">→</span>
+          </a>
+        </section>
+        <section aria-labelledby="bycountry" style="padding: 24px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px">
+          <div style="display: flex; justify-content: space-between; align-items: center"><h2 id="bycountry" style="margin: 0; font-size: 16px; font-weight: 600">Median total pay by country</h2><a href="Insights.dc.html" style="font-size: 13px">Open insights</a></div>
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">United States</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 100%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$138,200</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">Canada</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 74%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$101,900</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">Australia</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 71%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$98,400</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">Germany</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 66%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$91,700</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">United Kingdom</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 61%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$84,300</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">Singapore</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 58%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$80,100</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">Brazil</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 24%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$33,600</span></div>
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 84px; gap: 12px; align-items: center"><span style="font-size: 13px">India</span><div style="height: 10px; border-radius: 999px; background: #EFEDE7"><div style="width: 22%; height: 10px; border-radius: 999px; background: #3B46A0"></div></div><span style="font-family: 'Geist Mono', monospace; font-size: 13px; text-align: right">$30,500</span></div>
+          </div>
+          <p style="margin: 0; font-size: 12px; color: #5C6370">Converted at fixed reference rates for comparison. Local-currency figures on each profile.</p>
+        </section>
+      </div>
+      <section aria-labelledby="recent" style="padding: 24px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center"><h2 id="recent" style="margin: 0; font-size: 16px; font-weight: 600">Recent pay changes</h2><span style="font-size: 13px; color: #5C6370">Last 7 days</span></div>
+        <div style="overflow-x: auto">
+          <table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px">
+            <thead><tr style="text-align: left; color: #5C6370; font-size: 12px"><th style="padding: 8px 0; font-weight: 500">Employee</th><th style="padding: 8px 0; font-weight: 500">Reason</th><th style="padding: 8px 0; font-weight: 500">Effective</th><th style="padding: 8px 0; font-weight: 500; text-align: right">Change</th></tr></thead>
+            <tbody>
+              <tr style="border-top: 1px solid #EFEDE7"><td style="padding: 12px 0"><a href="Profile.dc.html" style="color: #16181D; font-weight: 500; text-decoration: none">Sofia Martins</a> <span style="color: #5C6370">· Account Executive L2 · Brazil</span></td><td style="padding: 12px 0">Market adjustment</td><td style="padding: 12px 0">1 Nov 2026</td><td style="padding: 12px 0; text-align: right; font-family: 'Geist Mono', monospace; color: #3E6A51">+8.0%</td></tr>
+              <tr style="border-top: 1px solid #EFEDE7"><td style="padding: 12px 0"><a href="Profile.dc.html" style="color: #16181D; font-weight: 500; text-decoration: none">Jonas Weber</a> <span style="color: #5C6370">· Data Analyst L3 · Germany</span></td><td style="padding: 12px 0">Promotion</td><td style="padding: 12px 0"><span style="padding: 2px 8px; border-radius: 999px; background: #EEF0FA; color: #2C3580; font-size: 12px">Pending · 1 Jan 2027</span></td><td style="padding: 12px 0; text-align: right; font-family: 'Geist Mono', monospace; color: #3E6A51">+11.5%</td></tr>
+              <tr style="border-top: 1px solid #EFEDE7"><td style="padding: 12px 0"><a href="Profile.dc.html" style="color: #16181D; font-weight: 500; text-decoration: none">Aisha Rahman</a> <span style="color: #5C6370">· Support Specialist L1 · Singapore</span></td><td style="padding: 12px 0">Correction</td><td style="padding: 12px 0">15 Sep 2026</td><td style="padding: 12px 0; text-align: right; font-family: 'Geist Mono', monospace; color: #5C6370">−1.2%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -37,6 +37,7 @@ Web-based **salary management** software where the HR Manager can **manage salar
 | M6 | **Effective-dated history:** every compensation change creates a new version with an **effective date** and a **reason** (hire, promotion, merit, market adjustment, correction). History is never overwritten. Future-dated changes are supported. |
 | M7 | **Total compensation calculation:** annual base, fixed cash, target variable, and total target compensation, in local currency **and** USD (fixed reference FX rates). |
 | M8 | **Seed script:** 10,000 deterministic employees with realistic structures, histories, and edge cases. |
+| M9 | **Simple login:** one HR Manager account whose credentials are set by environment variables. All pages and API routes require a valid session; logout ends it. Salary data is sensitive, so even a demo deployment shouldn't be open to anyone with the URL. |
 
 ### Should have (v1, makes it a product)
 | # | Feature |
@@ -47,7 +48,7 @@ Web-based **salary management** software where the HR Manager can **manage salar
 | S4 | **CSV export** of any filtered employee list. This is the bridge off Excel. |
 
 ### Could have (stretch)
-C1 Bulk CSV import with row-level validation report · C2 Annual merit-cycle planning (budget %, proposed raises) · C3 Single-user login.
+C1 Bulk CSV import with row-level validation report · C2 Annual merit-cycle planning (budget %, proposed raises).
 
 ## 4. Key Decisions & Assumptions
 
@@ -55,7 +56,7 @@ C1 Bulk CSV import with row-level validation report · C2 Annual merit-cycle pla
 - **Bonus and commission are stored as *targets*.** Recording actual payouts belongs to payroll and performance systems.
 - **Part-time pay is compared at full-time equivalent (FTE).** A 50% FTE employee on 40k is compared to the band as 80k.
 - **Money is stored as integer minor units with a currency code**; no floats are used for money. FX conversion uses a fixed, versioned reference-rate table, so results are deterministic and testable.
-- **Single persona, synthetic data.** No real PII.
+- **Single persona, synthetic data.** No real PII. One HR Manager login, configured by environment variables, not stored in the database.
 
 ## 5. Deliberately Out of Scope (and why)
 
@@ -65,7 +66,7 @@ C1 Bulk CSV import with row-level validation report · C2 Annual merit-cycle pla
 | **Actual bonus/commission payouts, performance ratings** | These come from sales and performance systems. We store the *agreed target*, which is what pay decisions are made on. |
 | **Equity / stock grants** | Valuation (vesting schedules, strike price, 409A-style valuations) is complex, and an approximate number would mislead. |
 | **Benefits (insurance, pension contributions)** | Usually set by country-level plans, not per-employee decisions. |
-| **Authentication / roles / approval workflows** | There's one persona. The data model records *reason* and *effective date* so an approval step can be added later without a schema change. |
+| **User management, SSO, roles & permissions, approval workflows** | There's one persona, so a single env-configured login (M9) is enough to protect the data. Sign-up, password reset, SSO, and multi-role access are a product of their own. The data model records *reason* and *effective date* so an approval step can be added later without a schema change. |
 | **Gender / pay-equity analytics** | Sensitive. It needs proper statistical controls and legal framing, and a naive version would mislead. |
 | **Live FX rates** | Non-deterministic and an external dependency. Reference rates are standard practice for compensation comparison. |
 
