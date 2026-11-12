@@ -25,3 +25,15 @@ class AppError(Exception):
 class NotFoundError(AppError):
     status_code = 404
     default_code = "NOT_FOUND"
+
+
+class ConflictError(AppError):
+    """The request is valid but clashes with the current state, e.g. a terminated employee."""
+
+    status_code = 409
+    default_code = "CONFLICT"
+
+
+class InvalidRequestError(AppError):
+    status_code = 422
+    default_code = "INVALID_REQUEST"
