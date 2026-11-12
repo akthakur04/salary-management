@@ -66,7 +66,7 @@ The product's job is to **turn 10,000 rows into understanding**. The Sage values
 | `border` | `#E5E3DD` | `#272B34` | Hairlines |
 | `primary` · *Insight Indigo* | `#3B46A0` | `#8E98F0` | Primary actions, focus, selected nav |
 | `sage` · *in band / positive* | `#4F7D63` | `#7FB596` | In-band, success |
-| `amber` · *attention* | `#B07A1E` | `#E0AE5A` | Below band, pending changes |
+| `amber` · *attention* | `#B07A1E` (text on tint: `#7A4E06`) | `#E0AE5A` | Below band. The darker text shade keeps small labels above 4.5:1 contrast. |
 | `rose` · *error / destructive* | `#B2433A` | `#E58177` | Validation errors, terminate |
 | `slate-violet` · *above band* | `#6B5FA8` | `#A99DE6` | Above band (informational, not "bad") |
 

@@ -1,0 +1,25 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-12T15:30:00Z"},
+  "title": "ACME Salary Management UI",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 900, "title": "1 · Sign in", "expand": "fill", "is_interactive": true},
+    "Overview.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 1180, "title": "2 · Overview", "expand": "fill", "is_interactive": true},
+    "Employees.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 1180, "title": "3 · Employees directory", "expand": "fill", "is_interactive": true},
+    "Profile.dc.html": {"x": 4560, "y": 0, "w": 1440, "h": 1280, "title": "4 · Employee profile", "expand": "fill", "is_interactive": true},
+    "Revise.dc.html": {"x": 0, "y": 1700, "w": 1440, "h": 1280, "title": "5 · Revise compensation (preview)", "expand": "fill", "is_interactive": true},
+    "Exceptions.dc.html": {"x": 1520, "y": 1700, "w": 1440, "h": 1100, "title": "6 · Exceptions", "expand": "fill", "is_interactive": true},
+    "Insights.dc.html": {"x": 3040, "y": 1700, "w": 1440, "h": 1320, "title": "7 · Insights", "expand": "fill", "is_interactive": true},
+    "Foundations.dc.html": {"x": 4560, "y": 1700, "w": 1440, "h": 1100, "title": "Foundations · Sage archetype"}
+  },
+  "order": ["Main.dc.html", "Overview.dc.html", "Employees.dc.html", "Profile.dc.html", "Revise.dc.html", "Exceptions.dc.html", "Insights.dc.html", "Foundations.dc.html"],
+  "notes": {
+    "row1": {"x": 0, "y": -300, "text": "Journey · sign in → orient → find → understand", "kind": "title1", "maxW": 5960},
+    "row2": {"x": 0, "y": 1400, "text": "Journey · act → review → answer  ·  Foundations", "kind": "title1", "maxW": 5960},
+    "persona": {"x": -620, "y": 0, "w": 520, "size": "m", "fill": "blue", "text": "Persona: Meera Iyer, HR Manager at ACME. Owns salary data for ~10,000 employees in 8 countries. Excel expert, not technical.\n\n\"I don't need more data. I need to trust the number and know what to do about it.\"\n\nArchetype: Sage (clarity, trusted insight), supported by Caregiver (pay is someone's livelihood, so be careful and calm).\n\nPlay any screen: the sidebar, rows and buttons link through the journey."},
+    "flow": {"x": -620, "y": 1700, "w": 520, "size": "m", "fill": "orange", "text": "Scenario on these boards: promote Ravi Kumar (Software Engineer L3, India) to L4 with a 12% raise, effective 1 Jan 2027.\n\nThe preview catches that the new base is still below the L4 band minimum before anything is saved. That's the Sage + Caregiver idea: show the consequence before the commitment."}
+  },
+  "designSystems": []
+}

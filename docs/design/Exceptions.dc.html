@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Exceptions · ACME Salary</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8F7F4}
+a{color:#3B46A0}a:hover{color:#2C3580}
+button:focus-visible{outline:2px solid #3B46A0;outline-offset:1px}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; font-family: Geist, Inter, system-ui, sans-serif; color: #16181D; background: #F8F7F4">
+  <nav aria-label="Main" style="flex: 1 1 232px; max-width: 100%; box-sizing: border-box; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #E5E3DD; background: #FFFFFF">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px">
+      <div style="width: 28px; height: 28px; border-radius: 7px; background: #3B46A0; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"><path d="M4 19V9"></path><path d="M10 19V5"></path><path d="M16 19v-7"></path><path d="M22 19H2"></path></svg></div>
+      <span style="font-size: 15px; font-weight: 600">ACME Salary</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Overview.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none">Overview</a>
+      <a href="Employees.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none">Employees</a>
+      <a href="Insights.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none">Insights</a>
+      <a href="Exceptions.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; background: #EEF0FA; color: #2C3580; font-size: 14px; font-weight: 600; text-decoration: none"><span style="flex: 1">Exceptions</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #FBF1DE; color: #7A4E06">749</span></a>
+    </div>
+    <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px; border-top: 1px solid #E5E3DD">
+      <div aria-hidden="true" style="width: 32px; height: 32px; border-radius: 999px; background: #E7F0EA; color: #3E6A51; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600">MI</div>
+      <div style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 600">Meera Iyer</span><span style="font-size: 12px; color: #5C6370">HR Manager</span></div>
+      <a href="Main.dc.html" style="font-size: 12px; color: #5C6370">Sign out</a>
+    </div>
+  </nav>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 32px; border-bottom: 1px solid #E5E3DD; background: #FFFFFF">
+      <nav aria-label="Breadcrumb" style="font-size: 13px; color: #5C6370"><a href="Overview.dc.html" style="color: #5C6370">Overview</a> / <span style="color: #16181D">Exceptions</span></nav>
+      <span style="margin-left: auto; font-size: 13px; color: #5C6370">As of <b style="color: #16181D; font-weight: 600">12 Nov 2026</b></span>
+    </header>
+    <main style="padding: 32px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; width: 100%; max-width: 1280px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.015em">Exceptions</h1>
+        <p style="margin: 0; font-size: 14px; color: #5C6370">Your review list: pay that sits outside policy, data that's missing, and changes about to land.</p>
+      </div>
+      <div role="tablist" aria-label="Exception type" style="display: flex; flex-wrap: wrap; gap: 8px">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+          <button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="{{t.style}}"><span>{{t.label}}</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px">{{t.count}}</span></button>
+        </sc-for>
+      </div>
+      <section role="tabpanel" style="border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; overflow: hidden">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #EFEDE7">
+          <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 15px; font-weight: 600">{{panelTitle}}</span><span style="font-size: 13px; color: #5C6370">{{panelHint}}</span></div>
+          <button type="button" style="height: 36px; padding: 0 12px; border: 1px solid #D9D6CE; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 13px; color: #16181D; cursor: pointer">Export list</button>
+        </div>
+        <div style="overflow-x: auto">
+          <table style="width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14px">
+            <thead><tr style="text-align: left; color: #5C6370; font-size: 12px; background: #FBFAF8"><th style="padding: 10px 20px; font-weight: 500">Employee</th><th style="padding: 10px 20px; font-weight: 500">Role · Country</th><th style="padding: 10px 20px; font-weight: 500; text-align: right">{{colA}}</th><th style="padding: 10px 20px; font-weight: 500; text-align: right">{{colB}}</th><th style="padding: 10px 20px; font-weight: 500">{{colC}}</th><th style="padding: 10px 20px; font-weight: 500"><span style="position: absolute; left: -9999px">Action</span></th></tr></thead>
+            <tbody>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+                <tr style="border-top: 1px solid #EFEDE7">
+                  <td style="padding: 12px 20px"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">{{r.name}}</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #5C6370">{{r.code}}</span></span></td>
+                  <td style="padding: 12px 20px; color: #3A3F48">{{r.role}}</td>
+                  <td style="padding: 12px 20px; text-align: right; font-family: 'Geist Mono', monospace">{{r.a}}</td>
+                  <td style="padding: 12px 20px; text-align: right; font-family: 'Geist Mono', monospace">{{r.b}}</td>
+                  <td style="padding: 12px 20px"><span style="{{r.chipStyle}}">{{r.c}}</span></td>
+                  <td style="padding: 12px 20px; text-align: right"><a href="Profile.dc.html" style="font-size: 13px; font-weight: 600">{{actionLabel}}</a></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding: 12px 20px; border-top: 1px solid #EFEDE7; font-size: 13px; color: #5C6370">Showing 6 of <span style="font-family: 'Geist Mono', monospace; color: #16181D">{{total}}</span> · sorted by largest gap first</div>
+      </section>
+      <p style="margin: 0; font-size: 13px; color: #5C6370">Contractors aren't banded, so they never appear under band exceptions. Part-time employees are compared at full-time equivalent.</p>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'below' }; }
+  renderVals() {
+    const amber = 'display: inline-flex; padding: 3px 10px; border-radius: 999px; background: #FBF1DE; color: #7A4E06; font-size: 12px; font-weight: 500';
+    const violet = 'display: inline-flex; padding: 3px 10px; border-radius: 999px; background: #EEECF7; color: #4F4590; font-size: 12px; font-weight: 500';
+    const indigo = 'display: inline-flex; padding: 3px 10px; border-radius: 999px; background: #EEF0FA; color: #2C3580; font-size: 12px; font-weight: 500';
+    const rose = 'display: inline-flex; padding: 3px 10px; border-radius: 999px; background: #FBEAE8; color: #8F2F27; font-size: 12px; font-weight: 500';
+    const groups = {
+      below: { label: 'Below band', count: 486, title: 'Paid below band minimum', hint: 'Base salary (at FTE) is under the minimum for the role, level and country.', a: 'Base salary', b: 'Band minimum', c: 'Gap', action: 'Review', rows: [
+        { name: 'Neha Gupta', code: 'EMP-03345', role: 'Software Engineer L3 · India', a: '₹21,10,000', b: '₹22,00,000', c: '−4.1% · ₹90,000', chipStyle: amber },
+        { name: 'Karthik Reddy', code: 'EMP-06630', role: 'Software Engineer L2 · India', a: '₹14,20,000', b: '₹15,00,000', c: '−5.3% · ₹80,000', chipStyle: amber },
+        { name: 'Lucas Oliveira', code: 'EMP-02231', role: 'Support Specialist L2 · Brazil', a: 'R$84,000', b: 'R$90,000', c: '−6.7% · R$6,000', chipStyle: amber },
+        { name: 'Hannah Clarke', code: 'EMP-05874', role: 'Product Designer L3 · UK', a: '£58,500', b: '£62,000', c: '−5.6% · £3,500', chipStyle: amber },
+        { name: 'Wei Ling Tan', code: 'EMP-07719', role: 'Data Analyst L2 · Singapore', a: 'S$66,000', b: 'S$70,000', c: '−5.7% · S$4,000', chipStyle: amber },
+        { name: 'Marcus Johnson', code: 'EMP-00918', role: 'Account Executive L1 · US', a: '$61,000', b: '$64,000', c: '−4.7% · $3,000', chipStyle: amber }
+      ]},
+      above: { label: 'Above band', count: 214, title: 'Paid above band maximum', hint: 'Often deliberate (retention, scarce skills). Worth confirming, not necessarily fixing.', a: 'Base salary', b: 'Band maximum', c: 'Over by', action: 'Review', rows: [
+        { name: 'Vikram Singh', code: 'EMP-07408', role: 'DevOps Engineer L4 · India', a: '₹39,80,000', b: '₹38,00,000', c: '+4.7%', chipStyle: violet },
+        { name: 'Emily Brooks', code: 'EMP-01642', role: 'Staff Engineer L5 · US', a: '$262,000', b: '$250,000', c: '+4.8%', chipStyle: violet },
+        { name: 'Felix Braun', code: 'EMP-03390', role: 'Sales Manager L4 · Germany', a: '€118,000', b: '€112,000', c: '+5.4%', chipStyle: violet },
+        { name: 'Olivia Chen', code: 'EMP-08105', role: 'Product Manager L4 · Canada', a: 'C$171,000', b: 'C$165,000', c: '+3.6%', chipStyle: violet },
+        { name: 'Jack Wilson', code: 'EMP-06027', role: 'Solutions Engineer L3 · Australia', a: 'A$158,000', b: 'A$150,000', c: '+5.3%', chipStyle: violet },
+        { name: 'Ana Souza', code: 'EMP-04460', role: 'Engineering Manager L5 · Brazil', a: 'R$412,000', b: 'R$400,000', c: '+3.0%', chipStyle: violet }
+      ]},
+      pending: { label: 'Pending changes', count: 37, title: 'Changes taking effect in the next 60 days', hint: 'Already saved and future-dated. The current package stays in force until the date.', a: 'Base today', b: 'New base', c: 'Effective', action: 'Open', rows: [
+        { name: 'Jonas Weber', code: 'EMP-02710', role: 'Data Analyst L3 → L4 · Germany', a: '€68,000', b: '€75,800', c: '1 Jan 2027', chipStyle: indigo },
+        { name: 'Ravi Kumar', code: 'EMP-04821', role: 'Software Engineer L3 → L4 · India', a: '₹24,00,000', b: '₹26,88,000', c: '1 Jan 2027', chipStyle: indigo },
+        { name: 'Grace Lee', code: 'EMP-09334', role: 'Recruiter L2 · Singapore', a: 'S$72,000', b: 'S$76,300', c: '1 Dec 2026', chipStyle: indigo },
+        { name: 'Tom Harris', code: 'EMP-01208', role: 'Account Executive L2 · UK', a: '£54,000', b: '£57,200', c: '1 Dec 2026', chipStyle: indigo },
+        { name: 'Isabela Costa', code: 'EMP-07562', role: 'QA Engineer L2 · Brazil', a: 'R$96,000', b: 'R$103,700', c: '1 Jan 2027', chipStyle: indigo },
+        { name: 'Noah Martin', code: 'EMP-05119', role: 'Finance Analyst L3 · Canada', a: 'C$88,000', b: 'C$93,300', c: '1 Jan 2027', chipStyle: indigo }
+      ]},
+      missing: { label: 'Missing package', count: 12, title: 'Employees without a salary package', hint: 'Excluded from totals and averages until a package is added. Usually recent hires.', a: 'Hire date', b: 'Days missing', c: 'Status', action: 'Add package', rows: [
+        { name: 'Chloe Dubois', code: 'EMP-10014', role: 'Marketing Specialist L2 · Canada', a: '3 Nov 2026', b: '9', c: 'No package', chipStyle: rose },
+        { name: 'Aarav Joshi', code: 'EMP-10011', role: 'Software Engineer L1 · India', a: '2 Nov 2026', b: '10', c: 'No package', chipStyle: rose },
+        { name: 'Mia Thompson', code: 'EMP-10009', role: 'Support Specialist L1 · Australia', a: '1 Nov 2026', b: '11', c: 'No package', chipStyle: rose },
+        { name: 'Leon Fischer', code: 'EMP-10006', role: 'Data Engineer L3 · Germany', a: '27 Oct 2026', b: '16', c: 'No package', chipStyle: rose },
+        { name: 'Sara Ahmed', code: 'EMP-10003', role: 'HR Generalist L2 · UK', a: '20 Oct 2026', b: '23', c: 'No package', chipStyle: rose },
+        { name: 'Daniel Kim', code: 'EMP-09998', role: 'Account Executive L1 · US', a: '13 Oct 2026', b: '30', c: 'No package', chipStyle: rose }
+      ]}
+    };
+    const order = ['below', 'above', 'pending', 'missing'];
+    const g = groups[this.state.tab];
+    const tabStyle = (sel) => 'display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 10px; font: inherit; font-size: 14px; cursor: pointer; ' + (sel ? 'border: 1px solid #3B46A0; background: #3B46A0; color: #FFFFFF; font-weight: 600' : 'border: 1px solid #D9D6CE; background: #FFFFFF; color: #16181D');
+    return {
+      tabs: order.map((k) => ({ label: groups[k].label, count: groups[k].count, selected: k === this.state.tab ? 'true' : 'false', style: tabStyle(k === this.state.tab), pick: () => this.setState({ tab: k }) })),
+      panelTitle: g.title, panelHint: g.hint, colA: g.a, colB: g.b, colC: g.c, actionLabel: g.action,
+      rows: g.rows, total: g.count
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ravi Kumar · ACME Salary</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F8F7F4}
+a{color:#3B46A0}a:hover{color:#2C3580}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; font-family: Geist, Inter, system-ui, sans-serif; color: #16181D; background: #F8F7F4">
+  <nav aria-label="Main" style="flex: 1 1 232px; max-width: 100%; box-sizing: border-box; padding: 20px 16px; display: flex; flex-direction: column; gap: 24px; border-right: 1px solid #E5E3DD; background: #FFFFFF">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px">
+      <div style="width: 28px; height: 28px; border-radius: 7px; background: #3B46A0; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"><path d="M4 19V9"></path><path d="M10 19V5"></path><path d="M16 19v-7"></path><path d="M22 19H2"></path></svg></div>
+      <span style="font-size: 15px; font-weight: 600">ACME Salary</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Overview.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="12" width="7" height="9" rx="1.5"></rect><rect x="3" y="16" width="7" height="5" rx="1.5"></rect></svg>Overview</a>
+      <a href="Employees.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; background: #EEF0FA; color: #2C3580; font-size: 14px; font-weight: 600; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7"></path><path d="M18 14a6.5 6.5 0 0 1 3.5 6"></path></svg>Employees</a>
+      <a href="Insights.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-6"></path><path d="M22 20H2"></path></svg>Insights</a>
+      <a href="Exceptions.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #3A3F48; font-size: 14px; text-decoration: none"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg><span style="flex: 1">Exceptions</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #FBF1DE; color: #7A4E06">749</span></a>
+    </div>
+    <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px; border-top: 1px solid #E5E3DD">
+      <div aria-hidden="true" style="width: 32px; height: 32px; border-radius: 999px; background: #E7F0EA; color: #3E6A51; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600">MI</div>
+      <div style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 600">Meera Iyer</span><span style="font-size: 12px; color: #5C6370">HR Manager</span></div>
+      <a href="Main.dc.html" style="font-size: 12px; color: #5C6370">Sign out</a>
+    </div>
+  </nav>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 32px; border-bottom: 1px solid #E5E3DD; background: #FFFFFF">
+      <nav aria-label="Breadcrumb" style="font-size: 13px; color: #5C6370"><a href="Employees.dc.html" style="color: #5C6370">Employees</a> / <span style="color: #16181D">Ravi Kumar</span></nav>
+      <span style="margin-left: auto; font-size: 13px; color: #5C6370">As of <b style="color: #16181D; font-weight: 600">12 Nov 2026</b></span>
+    </header>
+    <main style="padding: 32px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; width: 100%; max-width: 1280px">
+      <section aria-label="Employee" style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; padding: 24px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF">
+        <div style="display: flex; gap: 16px; align-items: center">
+          <div aria-hidden="true" style="width: 56px; height: 56px; border-radius: 999px; background: #EEF0FA; color: #2C3580; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600">RK</div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap"><h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em">Ravi Kumar</h1><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #5C6370">EMP-04821</span><span style="padding: 2px 8px; border-radius: 999px; background: #E7F0EA; color: #335A44; font-size: 12px; font-weight: 500">Active</span></div>
+            <span style="font-size: 14px; color: #3A3F48">Software Engineer · L3 · Engineering · Bengaluru, India</span>
+            <span style="font-size: 13px; color: #5C6370">Full-time · Joined 14 Mar 2022 · Paid in INR</span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button type="button" style="height: 40px; padding: 0 14px; border: 1px solid #D9D6CE; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 14px; color: #16181D; cursor: pointer">Edit details</button>
+          <a href="Revise.dc.html" style="display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #3B46A0; color: #FFFFFF; font-size: 14px; font-weight: 600; text-decoration: none">Revise compensation</a>
+        </div>
+      </section>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px">
+        <section aria-labelledby="pkg" style="padding: 24px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 16px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline"><h2 id="pkg" style="margin: 0; font-size: 16px; font-weight: 600">Salary package</h2><span style="font-size: 12px; color: #5C6370">Since 1 Apr 2025 · annual</span></div>
+          <dl style="margin: 0; display: flex; flex-direction: column; font-size: 14px">
+            <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #EFEDE7"><dt style="font-weight: 500">Base salary</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace">₹24,00,000</dd></div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0 10px 16px; border-bottom: 1px solid #EFEDE7; color: #3A3F48"><dt>Housing allowance <span style="color: #5C6370">· ₹30,000 / month</span></dt><dd style="margin: 0; font-family: 'Geist Mono', monospace">₹3,60,000</dd></div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0 10px 16px; border-bottom: 1px solid #EFEDE7; color: #3A3F48"><dt>Meal allowance <span style="color: #5C6370">· ₹2,200 / month</span></dt><dd style="margin: 0; font-family: 'Geist Mono', monospace">₹26,400</dd></div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #EFEDE7"><dt style="font-weight: 500">Fixed cash</dt><dd style="margin: 0; font-family: 'Geist Mono', monospace">₹27,86,400</dd></div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0 10px 16px; border-bottom: 1px solid #EFEDE7; color: #3A3F48"><dt>Annual bonus <span style="color: #5C6370">· target 10% of base · role default</span></dt><dd style="margin: 0; font-family: 'Geist Mono', monospace">₹2,40,000</dd></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0 4px"><dt style="font-weight: 600">Total target pay</dt><dd style="margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px"><span style="font-family: 'Geist Mono', monospace; font-size: 20px; font-weight: 500">₹30,26,400</span><span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #5C6370">≈ $36,317 at reference rate</span></dd></div>
+          </dl>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <div aria-hidden="true" style="display: flex; height: 8px; border-radius: 999px; overflow: hidden"><div style="width: 92%; background: #3B46A0"></div><div style="width: 8%; background: #8E98F0"></div></div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #5C6370"><span>Fixed 92%</span><span>Variable 8%</span></div>
+          </div>
+          <details style="font-size: 13px; color: #3A3F48"><summary style="cursor: pointer; color: #3B46A0">How is this calculated?</summary><p style="margin: 8px 0 0; line-height: 1.6">Total target pay = base + recurring allowances (monthly × 12) + target bonus and commission. One-time payments, like a sign-on bonus, are shown separately and never included.</p></details>
+          <div style="display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 8px; background: #F8F7F4; font-size: 13px; color: #3A3F48"><span>One-time · Sign-on bonus · paid 14 Mar 2022</span><span style="font-family: 'Geist Mono', monospace">₹1,50,000</span></div>
+        </section>
+        <section aria-labelledby="band" style="padding: 24px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 20px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline"><h2 id="band" style="margin: 0; font-size: 16px; font-weight: 600">Pay band</h2><span style="font-size: 12px; color: #5C6370">Software Engineer L3 · India</span></div>
+          <div style="display: flex; gap: 12px; align-items: baseline"><span style="font-family: 'Geist Mono', monospace; font-size: 36px; font-weight: 500; letter-spacing: -0.02em">0.89</span><span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: #E7F0EA; color: #335A44; font-size: 12px; font-weight: 500"><span aria-hidden="true">●</span>In band</span></div>
+          <p style="margin: 0; font-size: 14px; color: #3A3F48; line-height: 1.5">Compa-ratio: base salary ÷ band midpoint. Ravi is in band, <b>₹3,00,000 below the midpoint</b>.</p>
+          <div role="img" aria-label="Base salary 24 lakh within band 22 to 32 lakh, midpoint 27 lakh" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="position: relative; height: 28px">
+              <div style="position: absolute; left: 0; right: 0; top: 10px; height: 8px; border-radius: 999px; background: #E7F0EA"></div>
+              <div style="position: absolute; left: 50%; top: 4px; width: 2px; height: 20px; background: #4F7D63"></div>
+              <div style="position: absolute; left: 20%; top: 0; width: 4px; height: 28px; margin-left: -2px; border-radius: 2px; background: #16181D"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-family: 'Geist Mono', monospace; font-size: 12px; color: #5C6370"><span>Min ₹22,00,000</span><span>Mid ₹27,00,000</span><span>Max ₹32,00,000</span></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+            <div style="padding: 12px; border-radius: 8px; background: #F8F7F4; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5C6370">Peers in role &amp; country</span><span style="font-family: 'Geist Mono', monospace; font-size: 16px">214</span></div>
+            <div style="padding: 12px; border-radius: 8px; background: #F8F7F4; display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #5C6370">Peer median base</span><span style="font-family: 'Geist Mono', monospace; font-size: 16px">₹25,40,000</span></div>
+          </div>
+        </section>
+      </div>
+      <section aria-labelledby="hist" style="padding: 24px; border: 1px solid #E5E3DD; border-radius: 12px; background: #FFFFFF; display: flex; flex-direction: column; gap: 8px">
+        <h2 id="hist" style="margin: 0 0 8px; font-size: 16px; font-weight: 600">Compensation history</h2>
+        <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column">
+          <li style="display: grid; grid-template-columns: 20px 140px minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 12px 0; border-bottom: 1px solid #EFEDE7"><span aria-hidden="true" style="width: 10px; height: 10px; margin-top: 5px; border-radius: 999px; background: #3B46A0"></span><span style="font-size: 14px; font-weight: 500">1 Apr 2025</span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px">Merit increase <span style="padding: 1px 8px; border-radius: 999px; background: #EEF0FA; color: #2C3580; font-size: 11px; font-weight: 500">Current</span></span><span style="font-size: 13px; color: #5C6370">Base ₹22,00,000 → ₹24,00,000</span></span><span style="font-family: 'Geist Mono', monospace; font-size: 14px; color: #3E6A51">+9.1%</span></li>
+          <li style="display: grid; grid-template-columns: 20px 140px minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 12px 0; border-bottom: 1px solid #EFEDE7"><span aria-hidden="true" style="width: 10px; height: 10px; margin-top: 5px; border-radius: 999px; border: 2px solid #9BA1AC; box-sizing: border-box"></span><span style="font-size: 14px; font-weight: 500">1 Apr 2024</span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px">Promotion · L2 → L3</span><span style="font-size: 13px; color: #5C6370">Base ₹19,80,000 → ₹22,00,000 · bonus 10% added (L3 default)</span></span><span style="font-family: 'Geist Mono', monospace; font-size: 14px; color: #3E6A51">+11.1%</span></li>
+          <li style="display: grid; grid-template-columns: 20px 140px minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 12px 0; border-bottom: 1px solid #EFEDE7"><span aria-hidden="true" style="width: 10px; height: 10px; margin-top: 5px; border-radius: 999px; border: 2px solid #9BA1AC; box-sizing: border-box"></span><span style="font-size: 14px; font-weight: 500">1 Apr 2023</span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px">Merit increase</span><span style="font-size: 13px; color: #5C6370">Base ₹18,00,000 → ₹19,80,000</span></span><span style="font-family: 'Geist Mono', monospace; font-size: 14px; color: #3E6A51">+10.0%</span></li>
+          <li style="display: grid; grid-template-columns: 20px 140px minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 12px 0"><span aria-hidden="true" style="width: 10px; height: 10px; margin-top: 5px; border-radius: 999px; border: 2px solid #9BA1AC; box-sizing: border-box"></span><span style="font-size: 14px; font-weight: 500">14 Mar 2022</span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px">Hire · Software Engineer L2</span><span style="font-size: 13px; color: #5C6370">Base ₹18,00,000 · housing &amp; meal allowances</span></span><span style="font-family: 'Geist Mono', monospace; font-size: 14px; color: #5C6370">—</span></li>
+        </ol>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1280}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
