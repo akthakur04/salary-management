@@ -234,7 +234,7 @@ def test_transfer_starts_a_version_in_the_new_currency_and_keeps_old_figures() -
     history = history_of(HIRE)
     transfer = CompensationChange(
         date(2025, 6, 1),
-        ChangeReason.MARKET_ADJUSTMENT,
+        ChangeReason.TRANSFER,
         SE_L3,
         "DE",
         CompensationPackage(Money(68_000_00, "EUR")),
