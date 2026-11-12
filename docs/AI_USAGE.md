@@ -34,3 +34,20 @@ Before writing code, the AI read all the docs and screen sources and raised nine
 | Q7 | Profile peer stats ("peers in role & country", peer median) | Part of `GET /employees/{id}` | 5 |
 | Q8 | Dependencies not named in the prompt: `pydantic-settings`, `uvicorn`, `PyJWT`, `psycopg[binary]`, `httpx`, `pytest-cov` | **Approved** | 1–7 |
 | Q9 | mypy strict only on `domain/`, or on all of `app/` | **Strict on all of `app/`** (and tests) | 1 |
+
+### What the AI generated
+
+- **Prompt:** the master prompt, Phase 1 section.
+- **Output:** the layered `backend/` package, `pyproject.toml` (ruff, strict mypy, pytest), settings from env, the database engine and session factory, an injectable `Clock`, an app factory with `GET /api/v1/health`, the single error handler, the GitHub Actions CI workflow, `.env.example` and a README stub.
+- **Test-first:** the clock, health check and error shape were each committed as a failing test (`test:`) before the implementation (`feat:`).
+
+### Corrections during the phase
+
+- The AI's first clock test passed in a time that was already converted to UTC, so it couldn't fail if the clock skipped the conversion. The AI caught this during its own review and fixed the test, before pushing, so it now uses a New York evening that is already the next day in UTC.
+- The first scaffold commit included the generated `*.egg-info` build folder. It was removed and added to `.gitignore` before pushing.
+
+### How the output was verified
+
+- `ruff check .`, `ruff format --check .` and `mypy` (strict) all pass.
+- `pytest`: 13 tests pass in under 0.1 s.
+- The real server was started with `uvicorn app.main:create_app --factory`. `/api/v1/health` returned `{"status":"ok","database":"ok"}`, an unknown route returned the standard error shape, and `/docs` loaded.
