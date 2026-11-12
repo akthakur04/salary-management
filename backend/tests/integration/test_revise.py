@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 from app.core.clock import FixedClock
 from app.core.errors import ConflictError, NotFoundError
 from app.domain.components import Component, ComponentBasis, ComponentType, Frequency
+from app.domain.employment import EmploymentStatus, EmploymentType
 from app.domain.errors import CurrencyMismatchError, OverlappingVersionError
 from app.domain.money import Money
 from app.domain.versions import ChangeReason
+from app.models import Employee
 from app.repositories.compensation import CompensationRepository
 from app.services.compensation import CompensationService
 from app.services.employees import EmployeeService
@@ -209,3 +211,47 @@ def test_revising_a_terminated_employee_is_rejected(
         CompensationService(session).revise(employee_id, _merit(date(2026, 11, 1), 25_00_000))
 
     assert raised.value.code == "EMPLOYEE_TERMINATED"
+
+
+def _employee_without_a_package(session: Session) -> int:
+    employee = Employee(
+        employee_code="EMP-02904",
+        name="Priya Nair",
+        email="priya@acme.example",
+        employment_type=EmploymentType.FULL_TIME,
+        fte=Decimal("1"),
+        status=EmploymentStatus.ACTIVE,
+        hire_date=date(2020, 1, 6),
+    )
+    session.add(employee)
+    session.commit()
+    return employee.id
+
+
+def test_employee_without_a_package_gets_one_recorded_as_their_hire(
+    session: Session, reference: Reference
+) -> None:
+    employee_id = _employee_without_a_package(session)
+    first_package = RevisionRequest(
+        date(2020, 1, 6),
+        ChangeReason.HIRE,
+        lakh(30_00_000),
+        role_id=reference.se_l3_id,
+        country_code="IN",
+    )
+
+    CompensationService(session).revise(employee_id, first_package)
+
+    (stored,) = CompensationRepository(session).history(employee_id)
+    assert stored.version.reason is ChangeReason.HIRE
+    assert stored.version.package.components == ()
+
+
+def test_first_package_needs_a_role_and_country(session: Session, reference: Reference) -> None:
+    employee_id = _employee_without_a_package(session)
+    missing_role = RevisionRequest(date(2020, 1, 6), ChangeReason.HIRE, lakh(30_00_000))
+
+    with pytest.raises(ConflictError) as raised:
+        CompensationService(session).revise(employee_id, missing_role)
+
+    assert raised.value.code == "ROLE_AND_COUNTRY_REQUIRED"
