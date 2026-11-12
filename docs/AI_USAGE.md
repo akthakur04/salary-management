@@ -46,6 +46,13 @@ Before writing code, the AI read all the docs and screen sources and raised nine
 - The AI's first clock test passed in a time that was already converted to UTC, so it couldn't fail if the clock skipped the conversion. The AI caught this during its own review and fixed the test, before pushing, so it now uses a New York evening that is already the next day in UTC.
 - The first scaffold commit included the generated `*.egg-info` build folder. It was removed and added to `.gitignore` before pushing.
 
+### Candidate's addition: commit rules and git hooks
+
+- **Prompt:** the candidate asked whether pre-commit checks existed (they didn't) and asked for a contribution guide defining industry-standard commit guidelines, enforced by pre-commit, ruff and CI.
+- **Output:** `CONTRIBUTING.md` (Conventional Commits 1.0.0, branches, PRs); `.pre-commit-config.yaml` (hygiene hooks and ruff on commit, a commit-message check, mypy and pytest on push); `.cz.toml` (commitizen rules); and two new CI jobs that check every commit message in a PR and run the hooks.
+- **Design choice:** mypy and pytest run on push, not on commit, so the deliberately failing first commit of a TDD pair can still be recorded.
+- **Found while verifying:** commitizen's built-in preset accepted `fix: Fixed bug.` and ignored the 72-character limit set in its config file. The AI replaced the preset with a stricter pattern (lowercase description, no full stop, blank line before the body). It now passes the limit on the command line in the hook and in CI.
+
 ### How the output was verified
 
 - `ruff check .`, `ruff format --check .` and `mypy` (strict) all pass.

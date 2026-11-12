@@ -14,6 +14,7 @@ Salary management for an HR Manager looking after 10,000 employees across 8 coun
 | [PRODUCT_DESIGN.md](docs/PRODUCT_DESIGN.md) | Persona, brand archetype, voice, colour tokens, user journey |
 | [UI_DESIGN.md](docs/UI_DESIGN.md) | Screens and design decisions; sources in [docs/design/](docs/design/) |
 | [AI_USAGE.md](docs/AI_USAGE.md) | How AI was used, and where its output was corrected |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Commit message rules (Conventional Commits), branches, PRs, git hooks and CI checks |
 
 ## Backend
 
@@ -27,6 +28,7 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
+(cd .. && pre-commit install)   # git hooks, see CONTRIBUTING.md
 uvicorn app.main:create_app --factory --reload
 ```
 
