@@ -123,10 +123,41 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 | `GET /insights/band-distribution` | Below / in / above band counts by group. |
 | `GET /insights/exceptions` | Out of band, missing package, pending future changes. |
 | `GET /reference/{countries,departments,roles,pay-bands}` | Dropdown data. |
+| `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management (see §5a). Every other endpoint requires a session. |
 
 **Errors** use one consistent shape, `{ "error": { "code": "OVERLAPPING_VERSION", "message": "...", "details": {...} } }`. Domain exceptions map to 400/404/409/422 in a single handler, so routers have no try/except clutter.
 
 **Pagination:** offset/limit. At 10k rows offset cost is negligible, and keyset pagination would complicate arbitrary sorting for no benefit.
+
+## 5a. Authentication (env-based single login)
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant N as Next.js (middleware + /api proxy)
+    participant A as FastAPI
+    B->>N: GET /employees (no cookie)
+    N-->>B: 307 redirect → /login
+    B->>N: POST /api/auth/login {email, password}
+    N->>A: forward
+    A->>A: compare email; bcrypt.verify(password, HR_ADMIN_PASSWORD_HASH)
+    A-->>B: 200 + Set-Cookie: session=<signed JWT>; HttpOnly; Secure; SameSite=Lax
+    B->>N: GET /api/employees (cookie)
+    N->>A: forward with cookie
+    A->>A: verify JWT signature + expiry
+    A-->>B: 200 data
+```
+
+| Aspect | Decision |
+|---|---|
+| Credentials | `HR_ADMIN_EMAIL` and `HR_ADMIN_PASSWORD_HASH` (bcrypt) as backend env vars. No users table. The plain password is never stored, and a helper script generates the hash. |
+| Session | Signed JWT (`SESSION_SECRET`, HS256, 8-hour expiry) in an **HttpOnly, Secure, SameSite=Lax** cookie. JavaScript can't read it, which limits XSS impact. |
+| Enforcement | **FastAPI is the real gate:** a single `require_session` dependency on every router except `/auth/login`. Next.js `middleware.ts` only checks that the cookie exists and redirects to `/login`, for UX. |
+| Same-origin | Because Next.js proxies `/api/*`, the cookie is first-party, with no cross-site cookie or CORS configuration. |
+| Failure handling | Generic "invalid email or password" message (no account enumeration); constant-time comparison. |
+| Not included (yet) | Rate limiting / lockout, password reset, multiple users, roles. Noted as next steps. |
+
+Tests cover the happy path, wrong password, missing or expired or tampered cookie → 401, and that every protected router has the dependency attached (a single test walks the route table).
 
 ## 6. Performance at 10k employees
 
@@ -148,6 +179,7 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 frontend/
 ├── app/                      # Next.js App Router
 │   ├── layout.tsx            # root layout, providers (TanStack Query, theme)
+│   ├── login/                # public login page
 │   ├── (app)/                # authenticated shell: sidebar + header
 │   │   ├── page.tsx          # Overview (insights + exceptions summary)
 │   │   ├── employees/        # directory, [id] profile, new (hire)
@@ -158,6 +190,7 @@ frontend/
 │   └── ...                   # shared: Money, BandIndicator, EmptyState, ErrorState
 ├── features/                 # feature modules: employees, insights, exceptions
 ├── lib/                      # api client + query hooks, formatting, Zod schemas
+├── middleware.ts             # redirect to /login when no session cookie
 └── next.config.ts            # rewrites /api/* → FastAPI
 ```
 
@@ -184,7 +217,7 @@ GitHub main ──▶ Render: API (Docker) ──▶ Render Postgres
 ```
 - Alembic migrations run on API start-up; the seed runs once via a one-off command.
 - The browser never calls the API origin directly (same-origin via rewrites), so CORS stays closed.
-- Config through environment variables (`DATABASE_URL`, `API_ORIGIN`); `.env.example` committed.
+- Config through environment variables (`DATABASE_URL`, `API_ORIGIN`, `HR_ADMIN_EMAIL`, `HR_ADMIN_PASSWORD_HASH`, `SESSION_SECRET`); `.env.example` committed with placeholders only, and real values live in the hosting provider's secret store.
 
 ## 10. Key trade-offs
 
@@ -198,4 +231,4 @@ GitHub main ──▶ Render: API (Docker) ──▶ Render Postgres
 | Fixed reference FX | Live FX API | Deterministic and testable; standard practice for comparing pay. |
 | Offset pagination | Keyset | Negligible cost at this scale, and arbitrary sort columns stay simple. |
 | Soft-terminate instead of hard delete | Hard delete | Salary history is a record HR needs to keep. |
-| No auth in v1 | JWT/session auth | Single persona and synthetic data (see requirements §5). The API is ready for a single auth dependency later. |
+| Single env-configured login | No auth / full user management / OAuth provider | Salary data shouldn't sit behind a public URL, but one persona doesn't justify a users table or an identity provider. One auth dependency makes swapping in SSO later a local change. |
