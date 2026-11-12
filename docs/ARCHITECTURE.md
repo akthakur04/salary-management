@@ -86,18 +86,23 @@ erDiagram
 | Table | Key columns | Notes |
 |---|---|---|
 | `country` | `code` (ISO-3166), `name`, `currency` (ISO-4217) | One currency per country. |
-| `fx_rate` | `currency`, `usd_per_unit` (decimal), `rate_set` | Fixed, versioned reference rates. |
+| `fx_rate` | `currency`, `usd_per_unit` (decimal), `rate_set`, `is_active` | Fixed, versioned reference rates. Exactly one rate set is active, and all USD figures use it. |
 | `department` | `id`, `name` | |
 | `role` | `id`, `department_id`, `family`, `level` (1–5), `title` | e.g. Software Engineer, L3. |
 | `role_default_component` | `role_id`, `type`, `basis`, `value`, `frequency` | Template copied onto new hires (E3, E4). |
 | `pay_band` | `role_id`, `country_code`, `min/mid/max_minor` | Unique per (role, country). |
 | `employee` | `id`, `employee_code` (unique), `name`, `email` (unique), `country_code`, `role_id`, `employment_type`, `fte`, `status`, `hire_date`, `termination_date` | |
-| `compensation_version` | `id`, `employee_id`, `effective_from`, `effective_to` (nullable), `reason`, `currency`, `base_annual_minor`, **derived:** `fixed_cash_minor`, `target_variable_minor`, `ttc_minor`, `ttc_usd_minor`, `compa_ratio` | Immutable once written. |
+| `compensation_version` | `id`, `employee_id`, `effective_from`, `effective_to` (nullable), `reason`, `currency`, `base_annual_minor`, **derived (local currency only):** `fixed_cash_minor`, `target_variable_minor`, `ttc_minor` | Immutable once written. |
 | `compensation_component` | `version_id`, `type`, `basis`, `value`, `frequency`, `payout_date` | |
 
 ### Design decisions
 - **Versions are immutable; a change appends a new row.** A revision closes the previous version (`effective_to = new.effective_from`) and inserts the new one in **one transaction**. The service checks for overlaps (E16) and a partial unique index backs it up ("one open version per employee").
-- **Derived totals are stored on the version.** Because a version never changes and FX rates are versioned, its TTC, USD value, and compa-ratio can be computed **once at write time** by the domain layer. Insight queries then become simple `SUM`/`AVG`/`GROUP BY` over integer columns, with no recalculation of 10k packages per request. This is a deliberate denormalisation, and it's safe precisely because of immutability.
+- **Only values that depend on the version alone are stored on it.** Fixed cash, target variable, and TTC in **local currency** depend only on the version's own base and components. Since a version never changes, the domain layer computes them **once at write time**. This deliberate denormalisation means insight queries never have to unpack 10k component lists.
+- **Values that depend on external, changeable data are computed at read time:**
+  - **USD amounts** = `ttc_minor × usd_per_unit` of the *active* rate set (a join on `fx_rate`). If USD were stored per version, a rate update would leave old versions on old rates, and org-wide totals would silently mix exchange rates.
+  - **Compa-ratio and band position** = FTE-equivalent base vs. the *current* `pay_band` (a join on role + country). Bands are revised (typically yearly). A stored compa-ratio would go stale, and with it every "below band" flag and the Exceptions view.
+
+  Both are indexed joins over ~10k current versions, well within the latency budget. The calculation logic still lives in the domain layer; repositories supply the inputs.
 - **Money is stored as integers** (`*_minor` = cents/paise), with the currency on the row. A `Money` value object in the domain prevents adding different currencies.
 - **"Current" version** = `effective_from <= as_of AND (effective_to IS NULL OR effective_to > as_of)`.
 
@@ -114,7 +119,7 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 | `GET /employees/{id}` | Profile + current package + band comparison. |
 | `POST /employees` | Hire: creates the employee + first version (role defaults applied, overridable). |
 | `PATCH /employees/{id}` | Update non-compensation details. |
-| `DELETE /employees/{id}` | Soft-terminate by default (sets status + termination date). |
+| `POST /employees/{id}/terminate` | Ends employment: sets status + termination date, and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
 | `GET /employees/{id}/compensation` | Full version history. |
 | `POST /employees/{id}/compensation` | New version (raise, promotion, correction) with `effective_from` + `reason`. |
 | `GET /employees/export.csv` | CSV of the current filtered list (S4). |
@@ -125,7 +130,7 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 | `GET /reference/{countries,departments,roles,pay-bands}` | Dropdown data. |
 | `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management (see §5a). Every other endpoint requires a session. |
 
-**Errors** use one consistent shape, `{ "error": { "code": "OVERLAPPING_VERSION", "message": "...", "details": {...} } }`. Domain exceptions map to 400/404/409/422 in a single handler, so routers have no try/except clutter.
+**Errors** use one consistent shape, `{ "error": { "code": "OVERLAPPING_VERSION", "message": "...", "details": {...} } }`. Domain exceptions map to 400/404/409/422 in a single handler, so routers have no try/except clutter. A missing, expired, or tampered session returns **401** (`UNAUTHENTICATED`), and the UI responds by redirecting to `/login`.
 
 **Pagination:** offset/limit. At 10k rows offset cost is negligible, and keyset pagination would complicate arbitrary sorting for no benefit.
 
@@ -165,8 +170,8 @@ Tests cover the happy path, wrong password, missing or expired or tampered cooki
 |---|---|
 | Listing 10k rows | Never sent to the browser. Server-side paging, sorting, and filtering; max page size 100. |
 | Search | Indexed `LIKE 'prefix%'` on name and code. Postgres `pg_trgm` is a later option if fuzzy search is needed. |
-| Insight aggregates | SQL `GROUP BY` over stored derived integer columns of current versions: one query per widget. |
-| Median / percentiles | SQLite has no `percentile_cont`. To stay portable, the repository fetches the sorted `ttc_usd_minor` column for the filtered group (≤ 10k integers, ~80 KB) and the domain computes percentiles. This is fast, exact, and the same on both databases. |
+| Insight aggregates | One SQL query per widget: current versions joined to the active `fx_rate` (and `pay_band` for band widgets), then `GROUP BY`. Stored local totals mean no component unpacking. |
+| Median / percentiles | SQLite has no `percentile_cont`. To stay portable, the repository fetches the sorted USD-converted TTC for the filtered group (≤ 10k numbers, ~80 KB) and the domain computes percentiles. This is fast, exact, and the same on both databases. |
 | N+1 queries | Explicit `selectinload` for components; list endpoints use a single joined query. |
 | Seeding | Bulk inserts in batches inside one transaction; target < 15 s for 10k employees + ~30k versions. |
 | Frontend | TanStack Query caching, debounced search (300 ms), `placeholderData: keepPreviousData` to avoid table flicker while paging. |
@@ -178,11 +183,11 @@ Tests cover the happy path, wrong password, missing or expired or tampered cooki
 ```
 frontend/
 ├── app/                      # Next.js App Router
-│   ├── layout.tsx            # root layout, providers (TanStack Query, theme)
+│   ├── layout.tsx            # root layout, providers (TanStack Query)
 │   ├── login/                # public login page
 │   ├── (app)/                # authenticated shell: sidebar + header
 │   │   ├── page.tsx          # Overview (insights + exceptions summary)
-│   │   ├── employees/        # directory, [id] profile, new (hire)
+│   │   ├── employees/        # directory, [id] profile, [id]/revise, new (hire)
 │   │   ├── insights/
 │   │   └── exceptions/
 ├── components/
@@ -196,7 +201,7 @@ frontend/
 
 **Client vs. server components:** pages are thin server components that render the shell; interactive parts (data table, forms, charts) are client components that fetch through TanStack Query. FastAPI stays the single source of business logic, and Next.js doesn't duplicate it.
 
-Pages: **Overview** · **Directory** → **Employee profile** (package, band gauge, history timeline, "Revise compensation" dialog) · **Insights** · **Exceptions**. URL search params hold the filters, so views can be bookmarked and shared.
+Pages: **Overview** · **Directory** → **Employee profile** (package, band gauge, history timeline) → **Revise compensation** (full page at `/employees/[id]/revise`: form + live preview side by side, then an inline confirm step) · **Insights** · **Exceptions**. URL search params hold the filters, so views can be bookmarked and shared.
 
 ## 8. Testing strategy
 
@@ -226,9 +231,9 @@ GitHub main ──▶ Render: API (Docker) ──▶ Render Postgres
 | Next.js + separate FastAPI | Next.js API routes only, or a Vite SPA | Python owns the domain (role requirement, best tested there). Next.js adds routing, middleware, and same-origin proxying that a plain SPA would have to hand-roll. |
 | shadcn/ui | MUI / Ant Design | Owned, Tailwind-styled components give a modern, minimal look; we trade MUI's ready-made DataGrid for TanStack Table, which is a small, well-understood amount of code. |
 | Modular monolith | Microservices | One team, one domain, 10k rows. Simplicity wins. |
-| Store derived totals on immutable versions | Compute on every read | Fast, simple aggregate queries. Safe because versions never change. |
+| Store local-currency totals on immutable versions; compute USD and compa-ratio at read time | Store everything at write time / compute everything on read | Local totals depend only on the immutable version, so storing them is safe and keeps aggregates simple. USD and band position depend on FX rates and bands, which change, so storing them would go stale. |
 | SQLite (dev/test) + Postgres (prod) | Postgres everywhere | Zero-setup dev and fast tests. Risk of dialect drift is handled by using only portable SQL. |
 | Fixed reference FX | Live FX API | Deterministic and testable; standard practice for comparing pay. |
 | Offset pagination | Keyset | Negligible cost at this scale, and arbitrary sort columns stay simple. |
-| Soft-terminate instead of hard delete | Hard delete | Salary history is a record HR needs to keep. |
+| Explicit `terminate` action, no delete | `DELETE` (hard or soft) | Salary history is a record HR needs to keep, and a verb that says what it does avoids surprising API consumers. |
 | Single env-configured login | No auth / full user management / OAuth provider | Salary data shouldn't sit behind a public URL, but one persona doesn't justify a users table or an identity provider. One auth dependency makes swapping in SSO later a local change. |

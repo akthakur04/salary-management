@@ -57,20 +57,21 @@ The product's job is to **turn 10,000 rows into understanding**. The Sage values
 
 ### Colour tokens
 
-| Token | Light | Dark | Use |
-|---|---|---|---|
-| `background` | `#F8F7F4` warm paper | `#0F1115` | App background |
-| `surface` | `#FFFFFF` | `#171A21` | Cards, tables |
-| `ink` | `#16181D` | `#ECEDEF` | Primary text |
-| `muted` | `#5C6370` | `#9BA1AC` | Secondary text, labels |
-| `border` | `#E5E3DD` | `#272B34` | Hairlines |
-| `primary` · *Insight Indigo* | `#3B46A0` | `#8E98F0` | Primary actions, focus, selected nav |
-| `sage` · *in band / positive* | `#4F7D63` | `#7FB596` | In-band, success |
-| `amber` · *attention* | `#B07A1E` (text on tint: `#7A4E06`) | `#E0AE5A` | Below band. The darker text shade keeps small labels above 4.5:1 contrast. |
-| `rose` · *error / destructive* | `#B2433A` | `#E58177` | Validation errors, terminate |
-| `slate-violet` · *above band* | `#6B5FA8` | `#A99DE6` | Above band (informational, not "bad") |
+| Token | Value | Use |
+|---|---|---|
+| `background` | `#F8F7F4` warm paper | App background |
+| `surface` | `#FFFFFF` | Cards, tables |
+| `ink` | `#16181D` | Primary text |
+| `muted` | `#5C6370` | Secondary text, labels |
+| `border` | `#E5E3DD` | Hairlines |
+| `primary` · *Insight Indigo* | `#3B46A0` | Primary actions, focus, selected nav |
+| `primary-soft` | `#8E98F0` | Secondary data series (e.g. variable pay in mix bars) |
+| `sage` · *in band / positive* | `#4F7D63` | In-band, success |
+| `amber` · *attention* | `#B07A1E` (text on tint: `#7A4E06`) | Below band. The darker text shade keeps small labels above 4.5:1 contrast. |
+| `rose` · *error / destructive* | `#B2433A` | Validation errors, terminate |
+| `slate-violet` · *above band* | `#6B5FA8` | Above band (informational, not "bad") |
 
-Rules: one primary colour per screen; status colours appear only on status. Below band is **amber, not red**, because it's something to review, not an error.
+The product ships a **single light theme**. Dark mode is deliberately left out: it doubles the colour and contrast work for every status state, and the HR Manager works on an office laptop during the day. Rules: one primary colour per screen; status colours appear only on status. Below band is **amber, not red**, because it's something to review, not an error.
 
 ### Typography & layout
 - **Geist Sans** for UI and **Geist Mono** with tabular figures for every amount, so columns of money line up.
@@ -114,8 +115,8 @@ journey
 | 2 | **Orient** | Overview | Sees the state of pay at a glance. | KPI cards (headcount, total annual pay in USD, median pay, % bonus-eligible) and an exceptions summary with deep links. |
 | 3 | **Find** | Employees directory | Searches "Ravi", filters Country = India, Dept = Engineering. | Server-side table with band-position chips; filters kept in the URL. |
 | 4 | **Understand** | Employee profile | Reviews Ravi's full package. | Header (role, level, country, type), package breakdown (base, allowances, bonus, total), band gauge with compa-ratio, history timeline. |
-| 5 | **Act** | Revise compensation (sheet) | Promotion: L3 → L4, base +12%, effective 1 Jan. | Applies the L4 role defaults (15% bonus), shows a **live preview**: before → after, % change, new band position. Validation inline. |
-| 6 | **Confirm** | Confirmation dialog | Checks the summary and confirms. | Saves a new version; toast "Compensation updated · effective 1 Jan 2027"; the change appears as *pending* until that date. |
+| 5 | **Act** | Revise compensation (full page) | Promotion: L3 → L4, base +12%, effective 1 Jan. | Applies the L4 role defaults (15% bonus), shows a **live preview**: before → after, % change, new band position. Validation inline. |
+| 6 | **Confirm** | Inline confirm step (same page) | Checks the summary and confirms. | Saves a new version; toast "Compensation updated · effective 1 Jan 2027"; the change appears as *pending* until that date. |
 | 7 | **Review** | Exceptions | Works through below-band employees. | Grouped list (below band, missing package, pending changes) with one-click into each profile. |
 | 8 | **Answer** | Insights | Answers "How do we pay Engineering across countries?" | Breakdown by country/department/level (count, min / median / max), fixed vs. variable mix, band distribution. |
 | 9 | **Share** | Directory → Export | Exports the filtered list. | CSV matching the current filters. |

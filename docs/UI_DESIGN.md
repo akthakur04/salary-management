@@ -28,4 +28,4 @@ Built in Claude Design from [PRODUCT_DESIGN.md](PRODUCT_DESIGN.md) (persona, Sag
 
 ## Mapping to implementation
 
-Screens map 1:1 to Next.js routes (`/login`, `/`, `/employees`, `/employees/[id]`, `/employees/[id]/revise` as a sheet, `/exceptions`, `/insights`). Tokens map to shadcn/ui CSS variables in `globals.css`.
+Screens map 1:1 to Next.js routes (`/login`, `/`, `/employees`, `/employees/[id]`, `/employees/[id]/revise` as a full page, since the live preview needs the room, `/exceptions`, `/insights`). Tokens map to shadcn/ui CSS variables in `globals.css`.
