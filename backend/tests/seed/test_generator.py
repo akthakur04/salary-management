@@ -8,7 +8,7 @@ import pytest
 from app.domain.bands import BandPosition, compare_to_band
 from app.domain.employment import EmploymentStatus, EmploymentType, status_on
 from app.domain.money import Money
-from app.domain.role_defaults import components_for_new_hire
+from app.domain.role_defaults import RoleDefaultComponent, components_for_new_hire
 from app.domain.versions import ChangeReason, current_version, ensure_valid_history, pending_changes
 from app.seed.generator import SEED_TODAY, SeedData, SeedEmployee, generate
 from app.seed.reference_data import COUNTRIES
@@ -117,7 +117,7 @@ def test_most_banded_employees_are_paid_within_their_band(sample: SeedData) -> N
 
 
 def test_about_twenty_percent_override_a_role_default(sample: SeedData) -> None:
-    defaults = {role_id: [] for role_id in (role.id for role in sample.roles)}
+    defaults: dict[int, list[RoleDefaultComponent]] = {role.id: [] for role in sample.roles}
     for role_id, default in sample.role_defaults:
         defaults[role_id].append(default)
     eligible = overridden = 0
