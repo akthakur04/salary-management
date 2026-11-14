@@ -113,6 +113,9 @@ class EmployeeRepository:
     def get(self, employee_id: int) -> Employee | None:
         return self._session.get(Employee, employee_id)
 
+    def get_one(self, employee_id: int) -> Employee:
+        return self._session.get_one(Employee, employee_id)
+
     def add(self, employee: Employee) -> int:
         self._session.add(employee)
         self._session.flush()

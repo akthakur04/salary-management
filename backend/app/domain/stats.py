@@ -7,10 +7,12 @@ in one currency, typically USD at reference rates.
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from app.domain.bands import BandPosition
 from app.domain.money import round_half_even
+
+_ONE_DECIMAL = Decimal("0.1")
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +57,13 @@ def band_distribution(positions: Iterable[BandPosition]) -> BandDistribution:
         in_band=counted.count(BandPosition.IN_BAND),
         above=counted.count(BandPosition.ABOVE),
     )
+
+
+def share_percent(part: int | Decimal, whole: int | Decimal) -> Decimal | None:
+    """`part` as a percentage of `whole`, to one decimal place; None when `whole` is zero."""
+    if whole == 0:
+        return None
+    return (Decimal(part) * 100 / Decimal(whole)).quantize(_ONE_DECIMAL, rounding=ROUND_HALF_EVEN)
 
 
 def _median(sorted_values: list[int]) -> int:

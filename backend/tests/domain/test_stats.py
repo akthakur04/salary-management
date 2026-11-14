@@ -1,5 +1,13 @@
+from decimal import Decimal
+
 from app.domain.bands import BandPosition
-from app.domain.stats import BandDistribution, PaySummary, band_distribution, summarise_pay
+from app.domain.stats import (
+    BandDistribution,
+    PaySummary,
+    band_distribution,
+    share_percent,
+    summarise_pay,
+)
 
 
 def test_pay_summary_reports_count_min_median_mean_and_max() -> None:
@@ -52,3 +60,13 @@ def test_contractors_are_excluded_from_band_distribution() -> None:
 
     assert distribution == BandDistribution(below=1, in_band=2, above=1)
     assert distribution.banded == 4
+
+
+def test_share_is_a_percentage_to_one_decimal_rounded_half_to_even() -> None:
+    assert share_percent(2, 3) == Decimal("66.7")
+    assert share_percent(Decimal("0.25"), Decimal("1000")) == Decimal("0.0")
+    assert share_percent(Decimal("0.75"), Decimal("1000")) == Decimal("0.1")
+
+
+def test_share_of_nothing_is_none() -> None:
+    assert share_percent(0, 0) is None
