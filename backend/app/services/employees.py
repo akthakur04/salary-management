@@ -123,6 +123,9 @@ class EmployeeService:
                 "Use terminate to end employment, so the last day is recorded.",
                 code="USE_TERMINATE",
             )
+        # Validate everything before touching the row: a half-applied change would
+        # stay in the session and be saved by the next commit.
+        email = employee.email
         if changes.email is not None:
             identity = EmployeeIdentity(employee.employee_code, changes.email)
             others = [
@@ -131,13 +134,14 @@ class EmployeeService:
                 if other.employee_code != employee.employee_code
             ]
             ensure_unique_identity(identity, others)
-            employee.email = identity.email
+            email = identity.email
         employment_type = changes.employment_type or employee.employment_type
         fte = changes.fte if changes.fte is not None else employee.fte
         validate_fte(employment_type, fte)
 
         try:
             with transaction(self._session):
+                employee.email = email
                 employee.employment_type = employment_type
                 employee.fte = fte
                 if changes.name is not None:
