@@ -191,8 +191,25 @@ class _Directory:
         )
         self.base: Select[*tuple[Any, ...]] = (
             select(
-                Employee,
-                current,
+                # Plain columns, not ORM entities: the rows are only read, and building
+                # 10,000 identity-mapped objects would dominate the insight endpoints.
+                Employee.id,
+                Employee.employee_code,
+                Employee.name,
+                Employee.email,
+                Employee.employment_type,
+                Employee.fte,
+                Employee.status,
+                Employee.hire_date,
+                Employee.termination_date,
+                current.id.label("version_id"),
+                current.effective_from,
+                current.reason,
+                current.currency,
+                current.base_annual_minor,
+                current.fixed_cash_minor,
+                current.target_variable_minor,
+                current.ttc_minor,
                 Role.title,
                 Role.level,
                 Department.name.label("department"),
@@ -306,61 +323,46 @@ class _Directory:
         return [direction.nulls_last(), Employee.id]
 
     def to_record(self, row: Row[Any]) -> EmployeeRecord:
-        (
-            employee,
-            current,
-            role_title,
-            level,
-            department,
-            country_code,
-            country_name,
-            band_currency,
-            min_minor,
-            mid_minor,
-            max_minor,
-            usd_per_unit,
-            role_id,
-        ) = tuple(row)
         band = (
             DomainPayBand(
-                Money(min_minor, band_currency),
-                Money(mid_minor, band_currency),
-                Money(max_minor, band_currency),
+                Money(row.min_minor, row.band_currency),
+                Money(row.mid_minor, row.band_currency),
+                Money(row.max_minor, row.band_currency),
             )
-            if min_minor is not None
+            if row.min_minor is not None
             else None
         )
         package = (
             CurrentPackage(
-                version_id=current.id,
-                effective_from=current.effective_from,
-                reason=current.reason,
-                currency=current.currency,
-                base_annual_minor=current.base_annual_minor,
-                fixed_cash_minor=current.fixed_cash_minor,
-                target_variable_minor=current.target_variable_minor,
-                ttc_minor=current.ttc_minor,
+                version_id=row.version_id,
+                effective_from=row.effective_from,
+                reason=row.reason,
+                currency=row.currency,
+                base_annual_minor=row.base_annual_minor,
+                fixed_cash_minor=row.fixed_cash_minor,
+                target_variable_minor=row.target_variable_minor,
+                ttc_minor=row.ttc_minor,
             )
-            if current is not None
+            if row.version_id is not None
             else None
         )
         return EmployeeRecord(
-            id=employee.id,
-            employee_code=employee.employee_code,
-            name=employee.name,
-            email=employee.email,
-            employment_type=employee.employment_type,
-            fte=employee.fte,
-            status=status_on(employee.status, employee.termination_date, self.as_of),
-            hire_date=employee.hire_date,
-            termination_date=employee.termination_date,
-            role_id=role_id,
-            role_title=role_title,
-            level=level,
-            department=department,
-            country_code=country_code,
-            country_name=country_name,
+            id=row.id,
+            employee_code=row.employee_code,
+            name=row.name,
+            email=row.email,
+            employment_type=row.employment_type,
+            fte=row.fte,
+            status=status_on(row.status, row.termination_date, self.as_of),
+            hire_date=row.hire_date,
+            termination_date=row.termination_date,
+            role_id=row.role_id,
+            role_title=row.title,
+            level=row.level,
+            department=row.department,
+            country_code=row.country_code,
+            country_name=row.country_name,
             current=package,
             band=band,
-            usd_per_unit=usd_per_unit,
+            usd_per_unit=row.usd_per_unit,
         )
