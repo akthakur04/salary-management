@@ -212,3 +212,39 @@ def test_unknown_grouping_is_a_validation_error(signed_in: TestClient, path: str
     response = signed_in.get(f"{INSIGHTS}/{path}", params={"group_by": "planet"})
 
     assert response.status_code == 422
+
+
+def test_band_exceptions_are_sorted_largest_gap_first_with_signed_percentages(
+    signed_in: TestClient, company: dict[str, int], db: Session, reference: Reference
+) -> None:
+    hire = EmployeeService(db).hire
+    hire(
+        hire_request(
+            reference,
+            employee_code="EMP-06630",
+            name="Karthik Reddy",
+            email="karthik@acme.example",
+            base_annual_minor=lakh(20_00_000),
+        )
+    )
+    hire(
+        hire_request(
+            reference,
+            employee_code="EMP-07408",
+            name="Vikram Singh",
+            email="vikram@acme.example",
+            role_id=reference.se_l4_id,
+            base_annual_minor=lakh(39_80_000),
+        )
+    )
+
+    below = signed_in.get(f"{INSIGHTS}/exceptions", params={"type": "below"}).json()
+    above = signed_in.get(f"{INSIGHTS}/exceptions", params={"type": "above"}).json()
+
+    assert [(i["name"], i["gap_percent"]) for i in below["items"]] == [
+        ("Karthik Reddy", "-9.1"),
+        ("Neha Gupta", "-4.1"),
+    ]
+    (vikram,) = above["items"]
+    assert vikram["band_maximum"] == money(lakh(38_00_000))
+    assert (vikram["gap"], vikram["gap_percent"]) == (money(lakh(1_80_000)), "4.7")
