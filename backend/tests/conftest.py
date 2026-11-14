@@ -12,6 +12,7 @@ from pydantic import SecretStr
 from app.core.clock import FixedClock
 from app.core.config import Settings
 from app.main import create_app
+from app.models import Base
 
 HR_EMAIL = "meera.iyer@acme.example"
 HR_PASSWORD = "correct horse battery staple"
@@ -37,7 +38,9 @@ def make_test_settings(database_url: str = "sqlite://") -> Settings:
 
 @pytest.fixture
 def app() -> FastAPI:
-    return create_app(make_test_settings(), clock=FixedClock(TODAY))
+    app = create_app(make_test_settings(), clock=FixedClock(TODAY))
+    Base.metadata.create_all(app.state.session_factory.kw["bind"])
+    return app
 
 
 @pytest.fixture
