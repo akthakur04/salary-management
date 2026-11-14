@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -14,7 +15,12 @@ import {
 } from "@/components/ui/command";
 import { DEFAULT_FILTERS } from "@/lib/filters";
 import { useEmployees } from "@/lib/queries";
+import type { EmployeeSummary } from "@/lib/types";
 import { useDebounced } from "@/lib/use-debounced";
+
+function optionValue(employee: EmployeeSummary): string {
+  return `${employee.employee_code} ${employee.name}`;
+}
 
 /** ⌘K (Ctrl+K) finds anyone by name or employee code, from any page. */
 export function EmployeeSearch() {
@@ -23,6 +29,11 @@ export function EmployeeSearch() {
   const [query, setQuery] = useState("");
   const q = useDebounced(query.trim(), 300);
   const results = useEmployees({ ...DEFAULT_FILTERS, q }, 8);
+  const items = q ? (results.data?.items ?? []) : [];
+  const firstValue = items[0] ? optionValue(items[0]) : "";
+  // Results arrive after typing, so highlight the first one ourselves; Enter then opens it.
+  const [selected, setSelected] = useState("");
+  useEffect(() => setSelected(firstValue), [firstValue]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -45,6 +56,8 @@ export function EmployeeSearch() {
     <>
       <button
         type="button"
+        aria-label="Search employees by name or ID (Command K)"
+        aria-keyshortcuts="Meta+K Control+K"
         onClick={() => setOpen(true)}
         className="flex h-10 max-w-[520px] flex-[1_1_320px] items-center gap-2.5 rounded-[10px] border bg-background px-3 text-left text-sm text-muted-foreground hover:border-input"
       >
@@ -60,19 +73,20 @@ export function EmployeeSearch() {
         title="Find an employee"
         description="Search by name or employee code"
       >
-        <CommandInput
+        <Command shouldFilter={false} value={selected} onValueChange={setSelected}>
+          <CommandInput
           placeholder="Name or employee code, e.g. Ravi or EMP-04821"
           value={query}
           onValueChange={setQuery}
         />
         <CommandList>
           {q && !results.isFetching ? <CommandEmpty>No one matches “{q}”.</CommandEmpty> : null}
-          {q && results.data?.items.length ? (
+          {items.length ? (
             <CommandGroup heading="Employees">
-              {results.data.items.map((employee) => (
+              {items.map((employee) => (
                 <CommandItem
                   key={employee.id}
-                  value={`${employee.name} ${employee.employee_code}`}
+                  value={optionValue(employee)}
                   onSelect={() => go(employee.id)}
                 >
                   <span className="flex-1">
@@ -91,6 +105,7 @@ export function EmployeeSearch() {
             </CommandGroup>
           ) : null}
         </CommandList>
+        </Command>
       </CommandDialog>
     </>
   );
