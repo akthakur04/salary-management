@@ -85,15 +85,12 @@ def _count(session: Session, model: type[Any]) -> int:
 
 def _insert_rows(session: Session, model: type[Any], rows: Sequence[dict[str, Any]]) -> None:
     """Batched Core insert: the ORM's bulk path would issue one statement per row."""
-    if rows:
-        session.connection().execute(model.__table__.insert(), rows)
+    session.connection().execute(model.__table__.insert(), rows)
 
 
 def _insert_returning_ids(
     session: Session, model: type[Any], rows: Sequence[dict[str, Any]]
 ) -> list[int]:
-    if not rows:
-        return []
     table = model.__table__
     statement = table.insert().returning(table.c.id, sort_by_parameter_order=True)
     return list(session.connection().execute(statement, rows).scalars())
