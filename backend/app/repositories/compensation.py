@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -36,21 +37,12 @@ class CompensationRepository:
 
     def add(self, employee_id: int, version: CompensationVersion, note: str | None = None) -> int:
         """Store a version with its local-currency totals, computed once by the domain."""
-        totals = version.totals
         row = VersionRow(
-            employee_id=employee_id,
-            effective_from=version.effective_from,
-            effective_to=version.effective_to,
-            reason=version.reason,
-            role_id=version.role_id,
-            country_code=version.country_code,
-            currency=version.package.currency,
-            base_annual_minor=version.package.base_annual.amount_minor,
-            fixed_cash_minor=totals.fixed_cash.amount_minor,
-            target_variable_minor=totals.target_variable.amount_minor,
-            ttc_minor=totals.total_target_compensation.amount_minor,
-            note=note,
-            components=[_to_row(component) for component in version.package.components],
+            **version_values(employee_id, version, note),
+            components=[
+                CompensationComponent(**component_values(component))
+                for component in version.package.components
+            ],
         )
         self._session.add(row)
         self._session.flush()
@@ -63,16 +55,40 @@ class CompensationRepository:
         self._session.flush()
 
 
-def _to_row(component: Component) -> CompensationComponent:
-    return CompensationComponent(
-        type=component.type,
-        basis=component.basis,
-        frequency=component.frequency,
-        label=component.label,
-        amount_minor=component.amount.amount_minor if component.amount else None,
-        percent=component.percent,
-        payout_date=component.payout_date,
-    )
+def version_values(
+    employee_id: int, version: CompensationVersion, note: str | None = None
+) -> dict[str, Any]:
+    """Column values for a stored version, including the totals the domain computes.
+
+    Shared by the repository and the seed's bulk loader, so both store versions alike.
+    """
+    totals = version.totals
+    return {
+        "employee_id": employee_id,
+        "effective_from": version.effective_from,
+        "effective_to": version.effective_to,
+        "reason": version.reason,
+        "role_id": version.role_id,
+        "country_code": version.country_code,
+        "currency": version.package.currency,
+        "base_annual_minor": version.package.base_annual.amount_minor,
+        "fixed_cash_minor": totals.fixed_cash.amount_minor,
+        "target_variable_minor": totals.target_variable.amount_minor,
+        "ttc_minor": totals.total_target_compensation.amount_minor,
+        "note": note,
+    }
+
+
+def component_values(component: Component) -> dict[str, Any]:
+    return {
+        "type": component.type,
+        "basis": component.basis,
+        "frequency": component.frequency,
+        "label": component.label,
+        "amount_minor": component.amount.amount_minor if component.amount else None,
+        "percent": component.percent,
+        "payout_date": component.payout_date,
+    }
 
 
 def _to_domain(row: VersionRow) -> CompensationVersion:
