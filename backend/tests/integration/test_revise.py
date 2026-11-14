@@ -4,7 +4,6 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
-from app.core.clock import FixedClock
 from app.core.errors import ConflictError, NotFoundError
 from app.domain.components import Component, ComponentBasis, ComponentType, Frequency
 from app.domain.employment import EmploymentStatus, EmploymentType
@@ -49,8 +48,8 @@ BONUS_15 = ComponentInput(
 )
 
 
-def _hire_ravi(session: Session, reference: Reference, clock: FixedClock) -> int:
-    return EmployeeService(session, clock).hire(
+def _hire_ravi(session: Session, reference: Reference) -> int:
+    return EmployeeService(session).hire(
         hire_request(reference, components=(HOUSING, BONUS_10, SIGN_ON))
     )
 
@@ -60,9 +59,9 @@ def _merit(effective_from: date, rupees: int) -> RevisionRequest:
 
 
 def test_revision_closes_the_previous_version_and_adds_the_new_one(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+    employee_id = _hire_ravi(session, reference)
 
     CompensationService(session).revise(employee_id, _merit(date(2023, 4, 1), 19_80_000))
 
@@ -74,9 +73,9 @@ def test_revision_closes_the_previous_version_and_adds_the_new_one(
 
 
 def test_revision_keeps_recurring_components_but_not_one_time_payments(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+    employee_id = _hire_ravi(session, reference)
 
     CompensationService(session).revise(employee_id, _merit(date(2023, 4, 1), 19_80_000))
 
@@ -87,10 +86,8 @@ def test_revision_keeps_recurring_components_but_not_one_time_payments(
     ]
 
 
-def test_percentage_bonus_follows_the_new_base(
-    session: Session, reference: Reference, clock: FixedClock
-) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+def test_percentage_bonus_follows_the_new_base(session: Session, reference: Reference) -> None:
+    employee_id = _hire_ravi(session, reference)
 
     CompensationService(session).revise(employee_id, _merit(date(2023, 4, 1), 20_00_000))
 
@@ -98,10 +95,8 @@ def test_percentage_bonus_follows_the_new_base(
     assert merit.version.totals.target_variable == Money(lakh(2_00_000), "INR")
 
 
-def test_note_is_saved_with_the_history(
-    session: Session, reference: Reference, clock: FixedClock
-) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+def test_note_is_saved_with_the_history(session: Session, reference: Reference) -> None:
+    employee_id = _hire_ravi(session, reference)
     request = RevisionRequest(
         date(2023, 4, 1), ChangeReason.MERIT, lakh(19_80_000), note="2023 merit cycle"
     )
@@ -113,9 +108,9 @@ def test_note_is_saved_with_the_history(
 
 
 def test_promotion_moves_the_employee_to_the_new_role(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+    employee_id = _hire_ravi(session, reference)
     promotion = RevisionRequest(
         date(2027, 1, 1),
         ChangeReason.PROMOTION,
@@ -132,9 +127,9 @@ def test_promotion_moves_the_employee_to_the_new_role(
 
 
 def test_transfer_records_pay_in_the_new_country_currency(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    employee_id = EmployeeService(session, clock).hire(hire_request(reference))
+    employee_id = EmployeeService(session).hire(hire_request(reference))
     transfer = RevisionRequest(
         date(2024, 6, 1),
         ChangeReason.TRANSFER,
@@ -151,9 +146,9 @@ def test_transfer_records_pay_in_the_new_country_currency(
 
 
 def test_transfer_must_restate_fixed_amounts_in_the_new_currency(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+    employee_id = _hire_ravi(session, reference)
     transfer = RevisionRequest(
         date(2024, 6, 1), ChangeReason.TRANSFER, 68_000_00, country_code="DE"
     )
@@ -163,9 +158,9 @@ def test_transfer_must_restate_fixed_amounts_in_the_new_currency(
 
 
 def test_correction_dated_between_two_versions_is_rejected_and_nothing_changes(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+    employee_id = _hire_ravi(session, reference)
     service = CompensationService(session)
     service.revise(employee_id, _merit(date(2023, 4, 1), 19_80_000))
     before = CompensationRepository(session).history(employee_id)
@@ -178,9 +173,9 @@ def test_correction_dated_between_two_versions_is_rejected_and_nothing_changes(
 
 
 def test_revision_is_all_or_nothing(
-    session: Session, reference: Reference, clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+    session: Session, reference: Reference, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
+    employee_id = _hire_ravi(session, reference)
     before = CompensationRepository(session).history(employee_id)
 
     def fail_to_add(*_: object, **__: object) -> int:
@@ -202,10 +197,10 @@ def test_revising_an_unknown_employee_is_rejected(session: Session, reference: R
 
 
 def test_change_after_the_last_day_of_employment_is_rejected(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
-    EmployeeService(session, clock).terminate(employee_id, date(2026, 10, 31))
+    employee_id = _hire_ravi(session, reference)
+    EmployeeService(session).terminate(employee_id, date(2026, 10, 31))
 
     with pytest.raises(ConflictError) as raised:
         CompensationService(session).revise(employee_id, _merit(date(2026, 11, 1), 25_00_000))
@@ -213,11 +208,9 @@ def test_change_after_the_last_day_of_employment_is_rejected(
     assert raised.value.code == "CHANGE_AFTER_TERMINATION"
 
 
-def test_change_before_a_future_last_day_is_allowed(
-    session: Session, reference: Reference, clock: FixedClock
-) -> None:
-    employee_id = _hire_ravi(session, reference, clock)
-    EmployeeService(session, clock).terminate(employee_id, date(2027, 1, 31))
+def test_change_before_a_future_last_day_is_allowed(session: Session, reference: Reference) -> None:
+    employee_id = _hire_ravi(session, reference)
+    EmployeeService(session).terminate(employee_id, date(2027, 1, 31))
 
     CompensationService(session).revise(employee_id, _merit(date(2027, 1, 1), 25_00_000))
 

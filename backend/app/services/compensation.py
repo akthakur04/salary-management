@@ -33,10 +33,14 @@ class CompensationService:
         Returns the new version's id.
         """
         employee = require_employee(self._employees, employee_id)
-        if employee.status is EmploymentStatus.TERMINATED:
+        last_day = employee.termination_date
+        if employee.status is EmploymentStatus.TERMINATED or (
+            last_day is not None and request.effective_from > last_day
+        ):
             raise ConflictError(
-                "This employee is terminated, so their pay can't be changed.",
-                code="EMPLOYEE_TERMINATED",
+                "This change would start after the employee's last day.",
+                code="CHANGE_AFTER_TERMINATION",
+                details={"last_day": last_day.isoformat() if last_day else None},
             )
         stored = self._compensation.history(employee_id)
         history = tuple(entry.version for entry in stored)

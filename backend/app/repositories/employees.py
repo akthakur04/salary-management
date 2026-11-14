@@ -30,7 +30,7 @@ from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
 
 from app.domain.bands import BandPosition
 from app.domain.bands import PayBand as DomainPayBand
-from app.domain.employment import EmploymentStatus, EmploymentType
+from app.domain.employment import EmploymentStatus, EmploymentType, status_on
 from app.domain.identity import EmployeeIdentity
 from app.domain.money import Money
 from app.domain.versions import ChangeReason
@@ -151,6 +151,7 @@ class _Directory:
     """Builds the directory query for one `as_of` date."""
 
     def __init__(self, as_of: date) -> None:
+        self.as_of = as_of
         self.current = aliased(CompensationVersion, name="current_version")
         self.shown = aliased(CompensationVersion, name="shown_version")
         first = aliased(CompensationVersion, name="first_version")
@@ -203,6 +204,18 @@ class _Directory:
             .outerjoin(FxRate, and_(FxRate.currency == current.currency, FxRate.is_active))
         )
 
+    def status(self) -> ColumnElement[str]:
+        """Same rule as the domain's status_on: terminated from the day after the last day."""
+        return case(
+            (
+                and_(
+                    Employee.termination_date.is_not(None), Employee.termination_date < self.as_of
+                ),
+                literal(EmploymentStatus.TERMINATED.value),
+            ),
+            else_=Employee.status,
+        )
+
     def band_position(self) -> ColumnElement[str | None]:
         """Same rule as the domain's compare_to_band, in SQL so it can filter and count.
 
@@ -227,7 +240,9 @@ class _Directory:
         )
 
     def filtered(self, query: EmployeeQuery) -> Select[*tuple[Any, ...]]:
-        conditions: list[ColumnElement[bool]] = [Employee.status.in_(query.statuses)]
+        conditions: list[ColumnElement[bool]] = [
+            self.status().in_([status.value for status in query.statuses])
+        ]
         if query.q:
             conditions.append(
                 or_(
@@ -266,8 +281,7 @@ class _Directory:
         direction = column.desc() if query.descending else column.asc()
         return [direction.nulls_last(), Employee.id]
 
-    @staticmethod
-    def to_record(row: Row[Any]) -> EmployeeRecord:
+    def to_record(self, row: Row[Any]) -> EmployeeRecord:
         (
             employee,
             current,
@@ -313,7 +327,7 @@ class _Directory:
             email=employee.email,
             employment_type=employee.employment_type,
             fte=employee.fte,
-            status=employee.status,
+            status=status_on(employee.status, employee.termination_date, self.as_of),
             hire_date=employee.hire_date,
             termination_date=employee.termination_date,
             role_id=role_id,

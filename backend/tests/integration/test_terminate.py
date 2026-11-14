@@ -3,7 +3,6 @@ from datetime import date
 import pytest
 from sqlalchemy.orm import Session
 
-from app.core.clock import FixedClock
 from app.core.errors import ConflictError, InvalidRequestError, NotFoundError
 from app.domain.employment import EmploymentStatus, status_on
 from app.domain.versions import ChangeReason
@@ -20,9 +19,9 @@ def _status(employee: Employee, as_of: date) -> EmploymentStatus:
 
 
 def test_termination_records_the_last_day_and_keeps_the_history(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    service = EmployeeService(session, clock)
+    service = EmployeeService(session)
     employee_id = service.hire(hire_request(reference))
 
     service.terminate(employee_id, date(2026, 10, 31))
@@ -33,10 +32,8 @@ def test_termination_records_the_last_day_and_keeps_the_history(
     assert len(CompensationRepository(session).history(employee_id)) == 1
 
 
-def test_termination_can_be_dated_in_the_future(
-    session: Session, reference: Reference, clock: FixedClock
-) -> None:
-    service = EmployeeService(session, clock)
+def test_termination_can_be_dated_in_the_future(session: Session, reference: Reference) -> None:
+    service = EmployeeService(session)
     employee_id = service.hire(hire_request(reference))
 
     service.terminate(employee_id, date(2027, 1, 31))
@@ -47,9 +44,9 @@ def test_termination_can_be_dated_in_the_future(
 
 
 def test_termination_before_the_hire_date_is_rejected(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    service = EmployeeService(session, clock)
+    service = EmployeeService(session)
     employee_id = service.hire(hire_request(reference))
 
     with pytest.raises(InvalidRequestError) as raised:
@@ -59,9 +56,9 @@ def test_termination_before_the_hire_date_is_rejected(
 
 
 def test_terminating_with_a_change_due_after_the_last_day_is_rejected(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    service = EmployeeService(session, clock)
+    service = EmployeeService(session)
     employee_id = service.hire(hire_request(reference))
     raise_in_january = RevisionRequest(date(2027, 1, 1), ChangeReason.MERIT, lakh(20_00_000))
     CompensationService(session).revise(employee_id, raise_in_january)
@@ -75,9 +72,9 @@ def test_terminating_with_a_change_due_after_the_last_day_is_rejected(
 
 
 def test_termination_dated_on_or_after_a_pending_change_is_allowed(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
-    service = EmployeeService(session, clock)
+    service = EmployeeService(session)
     employee_id = service.hire(hire_request(reference))
     raise_in_january = RevisionRequest(date(2027, 1, 1), ChangeReason.MERIT, lakh(20_00_000))
     CompensationService(session).revise(employee_id, raise_in_january)
@@ -87,10 +84,8 @@ def test_termination_dated_on_or_after_a_pending_change_is_allowed(
     assert session.get_one(Employee, employee_id).termination_date == date(2027, 1, 1)
 
 
-def test_terminating_twice_is_rejected(
-    session: Session, reference: Reference, clock: FixedClock
-) -> None:
-    service = EmployeeService(session, clock)
+def test_terminating_twice_is_rejected(session: Session, reference: Reference) -> None:
+    service = EmployeeService(session)
     employee_id = service.hire(hire_request(reference))
     service.terminate(employee_id, date(2027, 1, 31))
 
@@ -101,7 +96,7 @@ def test_terminating_twice_is_rejected(
 
 
 def test_terminating_an_unknown_employee_is_rejected(
-    session: Session, reference: Reference, clock: FixedClock
+    session: Session, reference: Reference
 ) -> None:
     with pytest.raises(NotFoundError):
-        EmployeeService(session, clock).terminate(999, TODAY)
+        EmployeeService(session).terminate(999, TODAY)

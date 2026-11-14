@@ -40,7 +40,7 @@ BONUS_15 = ComponentInput(
 @pytest.fixture
 def directory(session: Session, reference: Reference, clock: FixedClock) -> DirectoryService:
     """Ten people covering the cases the directory must handle."""
-    hire = EmployeeService(session, clock).hire
+    hire = EmployeeService(session).hire
     revise = CompensationService(session).revise
 
     def person(code: str, name: str, **overrides: object) -> int:
@@ -88,7 +88,7 @@ def directory(session: Session, reference: Reference, clock: FixedClock) -> Dire
         base_annual_minor=58_000_00,
     )
     leaver = person("EMP-00001", "Old Timer")
-    EmployeeService(session, clock).terminate(leaver, date(2026, 6, 30))
+    EmployeeService(session).terminate(leaver, date(2026, 6, 30))
     person("EMP-09121", "Sneha Patil", hire_date=date(2027, 2, 1))
     session.add(
         Employee(
@@ -193,10 +193,10 @@ def test_terminated_employees_are_excluded_by_default(directory: DirectoryServic
 
 
 def test_employee_leaving_in_the_future_is_listed_until_their_last_day(
-    session: Session, reference: Reference, clock: FixedClock, directory: DirectoryService
+    session: Session, directory: DirectoryService
 ) -> None:
     neha = directory.list(EmployeeQuery(q="Neha")).items[0].record.id
-    EmployeeService(session, clock).terminate(neha, date(2026, 12, 31))
+    EmployeeService(session).terminate(neha, date(2026, 12, 31))
 
     on_last_day = directory.list(EmployeeQuery(q="Neha"), as_of=date(2026, 12, 31))
     day_after = directory.list(EmployeeQuery(q="Neha"), as_of=date(2027, 1, 1))

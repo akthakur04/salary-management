@@ -5,7 +5,6 @@ from datetime import date
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.clock import Clock
 from app.core.errors import ConflictError, InvalidRequestError
 from app.domain.employment import EmploymentStatus, validate_fte
 from app.domain.errors import DuplicateEmployeeError
@@ -29,9 +28,8 @@ from app.services.transactions import transaction
 
 
 class EmployeeService:
-    def __init__(self, session: Session, clock: Clock) -> None:
+    def __init__(self, session: Session) -> None:
         self._session = session
-        self._clock = clock
         self._employees = EmployeeRepository(session)
         self._compensation = CompensationRepository(session)
         self._reference = ReferenceRepository(session)
@@ -82,15 +80,22 @@ class EmployeeService:
         return employee_id
 
     def terminate(self, employee_id: int, termination_date: date) -> None:
-        """End employment. The record and its salary history are kept."""
+        """Record the last day of employment. The record and its salary history are kept.
+
+        The date may be in the future: the employee counts as terminated from the
+        day after it (see `status_on`), so no job has to flip a status later.
+        """
         employee = require_employee(self._employees, employee_id)
-        if employee.status is EmploymentStatus.TERMINATED:
+        if employee.termination_date is not None or (
+            employee.status is EmploymentStatus.TERMINATED
+        ):
             raise ConflictError(
-                "This employee is already terminated.", code="EMPLOYEE_ALREADY_TERMINATED"
+                "This employee already has a termination date.",
+                code="EMPLOYEE_ALREADY_TERMINATED",
             )
-        if not employee.hire_date <= termination_date <= self._clock.today():
+        if termination_date < employee.hire_date:
             raise InvalidRequestError(
-                "The termination date must be between the hire date and today.",
+                "The last day of employment can't be before the hire date.",
                 code="INVALID_TERMINATION_DATE",
                 details={
                     "termination_date": termination_date.isoformat(),
@@ -101,12 +106,11 @@ class EmployeeService:
         later = pending_changes(history, termination_date)
         if later:
             raise ConflictError(
-                "A saved pay change takes effect after this termination date, "
-                "so the employee can't be terminated on this date.",
+                "A saved pay change takes effect after this last day. "
+                "Choose a last day on or after the change.",
                 code="PENDING_CHANGE_AFTER_TERMINATION",
                 details={"effective_from": later[0].effective_from.isoformat()},
             )
 
         with transaction(self._session):
-            employee.status = EmploymentStatus.TERMINATED
             employee.termination_date = termination_date
