@@ -130,7 +130,7 @@ class EmployeeRepository:
         )
         return [EmployeeIdentity(row.employee_code, row.email) for row in rows]
 
-    def list(self, query: EmployeeQuery, as_of: date) -> Page[EmployeeRecord]:
+    def search(self, query: EmployeeQuery, as_of: date) -> Page[EmployeeRecord]:
         directory = _Directory(as_of)
         filtered = directory.filtered(query)
         total = self._session.scalar(select(func.count()).select_from(filtered.subquery()))
@@ -145,6 +145,27 @@ class EmployeeRepository:
             page=query.page,
             page_size=query.page_size,
         )
+
+    def list_all(self, query: EmployeeQuery, as_of: date) -> list[EmployeeRecord]:
+        """Every matching row, in the query's order (for CSV export)."""
+        directory = _Directory(as_of)
+        rows = self._session.execute(directory.filtered(query).order_by(*directory.ordering(query)))
+        return [directory.to_record(row) for row in rows]
+
+    def peer_bases(self, role_id: int, country_code: str, as_of: date) -> list[tuple[int, Decimal]]:
+        """Base and FTE of current, banded employees in the role and country on `as_of`."""
+        directory = _Directory(as_of)
+        query = EmployeeQuery(
+            role_id=role_id,
+            country_code=country_code,
+            employment_types=(EmploymentType.FULL_TIME, EmploymentType.PART_TIME),
+        )
+        statement = (
+            directory.filtered(query)
+            .with_only_columns(directory.current.base_annual_minor, Employee.fte)
+            .where(directory.current.id.is_not(None))
+        )
+        return [(base, fte) for base, fte in self._session.execute(statement)]
 
 
 class _Directory:

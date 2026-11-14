@@ -87,7 +87,7 @@ def test_seeded_data_works_with_the_directory(session: Session) -> None:
     seed_database(session, employees=SAMPLE)
     directory = DirectoryService(session, FixedClock(SEED_TODAY))
 
-    (ravi,) = directory.list(EmployeeQuery(q="Ravi Kumar")).items
+    (ravi,) = directory.search(EmployeeQuery(q="Ravi Kumar")).items
 
     assert ravi.band is not None
     assert ravi.band.compa_ratio == Decimal("0.89")

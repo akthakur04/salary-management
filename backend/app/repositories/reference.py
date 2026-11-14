@@ -55,6 +55,20 @@ class ReferenceRepository:
             for role, department in rows
         ]
 
+    def role_listing(self, role_id: int) -> RoleListing | None:
+        row = self._session.execute(
+            select(Role, Department.name)
+            .join(Department, Department.id == Role.department_id)
+            .where(Role.id == role_id)
+        ).one_or_none()
+        if row is None:
+            return None
+        role, department = row
+        return RoleListing(role, department, self.role_defaults(role_id))
+
+    def country(self, country_code: str) -> Country | None:
+        return self._session.get(Country, country_code)
+
     def pay_bands(
         self, role_id: int | None = None, country_code: str | None = None
     ) -> list[BandListing]:

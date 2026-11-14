@@ -25,14 +25,19 @@ class DirectoryService:
         self._employees = EmployeeRepository(session)
         self._clock = clock
 
-    def list(self, query: EmployeeQuery, as_of: date | None = None) -> Page[DirectoryEntry]:
-        page = self._employees.list(query, as_of or self._clock.today())
+    def search(self, query: EmployeeQuery, as_of: date | None = None) -> Page[DirectoryEntry]:
+        page = self._employees.search(query, as_of or self._clock.today())
         return Page(
             items=tuple(_entry(record) for record in page.items),
             total=page.total,
             page=page.page,
             page_size=page.page_size,
         )
+
+    def export(self, query: EmployeeQuery, as_of: date | None = None) -> list[DirectoryEntry]:
+        """Every matching employee, ignoring paging, for CSV export."""
+        records = self._employees.list_all(query, as_of or self._clock.today())
+        return [_entry(record) for record in records]
 
 
 def _entry(record: EmployeeRecord) -> DirectoryEntry:

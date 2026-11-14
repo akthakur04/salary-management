@@ -110,7 +110,7 @@ def _names(entries: tuple[DirectoryEntry, ...]) -> list[str]:
 
 
 def _find(directory: DirectoryService, name: str, as_of: date | None = None) -> DirectoryEntry:
-    page = directory.list(EmployeeQuery(q=name), as_of=as_of)
+    page = directory.search(EmployeeQuery(q=name), as_of=as_of)
     (entry,) = page.items
     return entry
 
@@ -178,15 +178,15 @@ def test_contractor_has_no_band(directory: DirectoryService) -> None:
 def test_band_position_filter_agrees_with_the_domain_comparison(
     directory: DirectoryService, position: BandPosition, expected: list[str]
 ) -> None:
-    page = directory.list(EmployeeQuery(band_position=position))
+    page = directory.search(EmployeeQuery(band_position=position))
 
     assert _names(page.items) == expected
     assert all(entry.band is not None and entry.band.position is position for entry in page.items)
 
 
 def test_terminated_employees_are_excluded_by_default(directory: DirectoryService) -> None:
-    default = directory.list(EmployeeQuery(page_size=100))
-    leavers = directory.list(EmployeeQuery(statuses=(EmploymentStatus.TERMINATED,)))
+    default = directory.search(EmployeeQuery(page_size=100))
+    leavers = directory.search(EmployeeQuery(statuses=(EmploymentStatus.TERMINATED,)))
 
     assert "Old Timer" not in _names(default.items)
     assert _names(leavers.items) == ["Old Timer"]
@@ -195,12 +195,12 @@ def test_terminated_employees_are_excluded_by_default(directory: DirectoryServic
 def test_employee_leaving_in_the_future_is_listed_until_their_last_day(
     session: Session, directory: DirectoryService
 ) -> None:
-    neha = directory.list(EmployeeQuery(q="Neha")).items[0].record.id
+    neha = directory.search(EmployeeQuery(q="Neha")).items[0].record.id
     EmployeeService(session).terminate(neha, date(2026, 12, 31))
 
-    on_last_day = directory.list(EmployeeQuery(q="Neha"), as_of=date(2026, 12, 31))
-    day_after = directory.list(EmployeeQuery(q="Neha"), as_of=date(2027, 1, 1))
-    leavers = directory.list(
+    on_last_day = directory.search(EmployeeQuery(q="Neha"), as_of=date(2026, 12, 31))
+    day_after = directory.search(EmployeeQuery(q="Neha"), as_of=date(2027, 1, 1))
+    leavers = directory.search(
         EmployeeQuery(statuses=(EmploymentStatus.TERMINATED,)), as_of=date(2027, 1, 1)
     )
 
@@ -239,30 +239,30 @@ def test_future_hire_shows_their_role_but_no_current_package(directory: Director
 def test_filters_narrow_the_list(
     directory: DirectoryService, query: EmployeeQuery, expected: list[str]
 ) -> None:
-    page = directory.list(query)
+    page = directory.search(query)
 
     assert sorted(_names(page.items)) == sorted(expected)
 
 
 def test_filters_by_department_and_role(directory: DirectoryService, reference: Reference) -> None:
-    sales = directory.list(EmployeeQuery(department_id=reference.sales_id))
-    senior = directory.list(EmployeeQuery(role_id=reference.se_l4_id))
+    sales = directory.search(EmployeeQuery(department_id=reference.sales_id))
+    senior = directory.search(EmployeeQuery(role_id=reference.se_l4_id))
 
     assert _names(sales.items) == ["Marcus Johnson"]
     assert _names(senior.items) == ["Vikram Singh"]
 
 
 def test_search_matches_the_start_of_a_name_ignoring_case(directory: DirectoryService) -> None:
-    assert _names(directory.list(EmployeeQuery(q="ravi")).items) == ["Ravi Kumar"]
-    assert _names(directory.list(EmployeeQuery(q="kumar")).items) == []
+    assert _names(directory.search(EmployeeQuery(q="ravi")).items) == ["Ravi Kumar"]
+    assert _names(directory.search(EmployeeQuery(q="kumar")).items) == []
 
 
 def test_search_treats_wildcards_as_plain_text(directory: DirectoryService) -> None:
-    assert directory.list(EmployeeQuery(q="%")).items == ()
+    assert directory.search(EmployeeQuery(q="%")).items == ()
 
 
 def test_sorting_by_total_pay_compares_everyone_in_usd(directory: DirectoryService) -> None:
-    page = directory.list(EmployeeQuery(sort=EmployeeSort.TOTAL_PAY_USD, descending=True))
+    page = directory.search(EmployeeQuery(sort=EmployeeSort.TOTAL_PAY_USD, descending=True))
 
     assert _names(page.items) == [
         "Hannah Clarke",
@@ -280,7 +280,7 @@ def test_sorting_by_total_pay_compares_everyone_in_usd(directory: DirectoryServi
 def test_pages_report_the_total_and_return_the_requested_slice(
     directory: DirectoryService,
 ) -> None:
-    page = directory.list(EmployeeQuery(page=2, page_size=3))
+    page = directory.search(EmployeeQuery(page=2, page_size=3))
 
     assert page.total == 9
     assert (page.page, page.page_size) == (2, 3)
