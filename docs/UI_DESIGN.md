@@ -28,4 +28,16 @@ Built in Claude Design from [PRODUCT_DESIGN.md](PRODUCT_DESIGN.md) (persona, Sag
 
 ## Mapping to implementation
 
-Screens map 1:1 to Next.js routes (`/login`, `/`, `/employees`, `/employees/[id]`, `/employees/[id]/revise` as a full page, since the live preview needs the room, `/exceptions`, `/insights`). Tokens map to shadcn/ui CSS variables in `globals.css`.
+Screens map 1:1 to Next.js routes (`/login`, `/`, `/employees`, `/employees/[id]`, `/employees/[id]/revise` as a full page, since the live preview needs the room, `/exceptions`, `/insights`), plus `/employees/new` for hiring (decision Q6; no designed screen, so it reuses the same components and tokens). Tokens map to shadcn/ui CSS variables in `frontend/app/globals.css`, light theme only.
+
+### Where the built app differs from the canvas, and why
+
+| Screen | Canvas | Built | Why |
+|---|---|---|---|
+| Overview, "Needs your attention" | "Most in Engineering · India (73) and Support · Brazil (41)" | A fixed one-line explanation per row | The breakdown behind that sentence isn't an API field. The counts and deep links are as designed. |
+| Overview, "Recent pay changes" | "Last 7 days" | "Latest recorded" | The endpoint returns the latest recorded changes rather than a time window (Phase 5 decision). |
+| Overview, KPI | Paid within band shows a below / in / above bar | Same, built from the band distribution | — |
+| Sign in, figures | 9,512 active employees | 10,000 employees | The page is shown before sign-in, so it can't load live counts. It states the product's scope instead. |
+| Exceptions | Six illustrative rows per tab | All rows, 25 per page, largest gap first; due-soon changes sorted by date | Real data. |
+| Revise | Reason list without "transfer" | Same; transfers aren't offered from this form | A transfer also needs a country and restated allowances, which this form doesn't collect. The API supports it. |
+| Header | "Figures as of 12 Nov 2026" | Today's date from the API | Live data. |

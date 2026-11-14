@@ -243,3 +243,53 @@ The AI pointed out that three rules together made some employees impossible to t
 - The preview test reproduces the demo scenario: promoting Ravi to L4 at ₹26,88,000 shows total pay ₹34,77,600, +12.0%, **below band by ₹1,12,000**, and saves nothing.
 - Timings against the full seed are in `docs/PERFORMANCE.md`. Every budgeted endpoint is within 300 ms p95: directory and profile at 2–22 ms, insights at about 230–260 ms.
 - **Smoke test:** a real `uvicorn` server with a `.env` holding a freshly generated hash. A request without a cookie and a wrong password each got 401, login set the expected cookie, and the summary and directory returned the seeded figures (Ravi at compa-ratio 0.89).
+
+## Phase 6: Frontend
+
+- **Prompt:** "Merged, start Phase 6". The work branched from `dev`, and its PR targets `dev`.
+- **Output:**
+  - A Next.js 15 app with shadcn/ui (Radix, Nova preset), the PRODUCT_DESIGN tokens as CSS variables (light only), Geist with tabular figures for amounts, and the `/api` proxy with the login-redirect middleware.
+  - A typed API client and TanStack Query hooks.
+  - The seven screens in journey order: Sign in, Overview, Employees, Profile, Revise, Exceptions, Insights.
+  - The hire form (decision Q6), ⌘K employee search, and the frontend CI job.
+- **Test-first:**
+  - formatting, band status, URL filters and form rules were committed as failing tests before the code
+  - so was the revise page's pure logic: the request body, quick picks and confirmation sentence
+  - the login component tests followed the page
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| The revise preview calls the server's dry-run endpoint (debounced 300 ms) | ARCHITECTURE §7 says the UI must not duplicate business logic. The preview is the server's calculation, so it can't drift from what's saved. |
+| Signed-in pages are client components | The session cookie is HttpOnly and only the browser sends it. Server-rendering data would mean forwarding cookies through Next.js. |
+| Keyboard and screen-reader support | Status chips always carry an icon and words. Charts have hidden data tables. The ⌘K search, tabs and sort headers are real buttons with names and states (`aria-pressed`, `aria-sort`, `aria-selected`). |
+| Packages needed by the chosen stack | `@hookform/resolvers` (upgraded to v5 for typed Zod transforms), shadcn's own dependencies (Radix, `cmdk`, `lucide-react`, `class-variance-authority`, `cn`, `sonner`, `tw-animate-css`), and `jsdom` with the Vite React plugin for Vitest. |
+| Small, deliberate departures from the canvas | Recorded in UI_DESIGN.md "Where the built app differs from the canvas". For example, the login page states scope figures because it can't load live counts before sign-in. |
+
+### Corrections during the phase
+
+These were caught by running the app in the preview browser rather than trusting the type checker:
+
+- **Serif text:** the type rendered in a serif font. The font variables were on `<body>` while the font family was applied on `<html>`.
+- **⌘K crash:** the palette crashed on open, because this shadcn version's `CommandDialog` expects the caller to add the `<Command>` root. Once fixed, Enter still did nothing: with server-side filtering, cmdk never highlighted results that arrived late. The selection is now controlled.
+- **Unnamed controls:** the promotion checkbox and the header search button had no accessible names.
+- **Future hires:** a future hire's profile offered "Record a package", even though their first package was already saved as pending.
+- **Mixed build output:** running `next build` beside the dev server corrupted the dev server's `.next` output, and the build was rerun cleanly. CI builds in its own checkout.
+- **Reported by the candidate after the PR:** autofilling the login crashed the page with "Cannot read properties of undefined (reading 'toLowerCase')". Browser autofill and password managers send `keydown` events with no `key`, and the ⌘K listener assumed one. A regression test reproduced it before the fix.
+
+Two generated-code issues were checked rather than assumed:
+
+- **A package named `cn`:** shadcn imported it, which looked like a stray third-party dependency. It turned out to be shadcn's own package (maintainer and repository checked), so it was kept.
+- **Dark mode:** the generated components came with 55 `dark:` classes and `next-themes`. All were removed, because the product is light only.
+
+### How the output was verified
+
+- **Checks:** `npm run lint`, `npm run typecheck`, 48 Vitest + Testing Library tests, and `next build` all pass. They cover money formatting, band-status rendering, filter ↔ URL wiring, form validation rules and the login form, the revise request body, quick picks and the confirmation sentence.
+- **Browser walk-through,** against the full seed with a local test login:
+  - The redirect to `/login` worked, as did validation messages and the server's generic error for a wrong password.
+  - The Overview KPIs and panels loaded.
+  - The directory filters were applied from the URL. Sorting set `aria-sort` and the URL. The CSV download held the same 63 filtered rows.
+  - Ravi's profile showed ₹30,26,400, a compa-ratio of 0.89 and a four-step history.
+- **The Revise demo:** with the defaults (promote to L4, +12%, bonus 15%), the server preview showed ₹26,88,000, total pay ₹34,77,600, a compa-ratio of 0.81 and the amber "₹1,12,000 short of the minimum" warning. A 150% bonus was rejected inline. After review → confirm, the change was saved as pending for 1 Jan 2027, and the Exceptions badge went from 1,488 to 1,489.
+- **The rest of the journey:** the Exceptions tabs and the Insights grouping work. Hiring a new employee led to their profile, and Sign out ended the session (the API then answered 401). No console errors appeared on any screen in a fresh tab.
