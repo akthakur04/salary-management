@@ -133,8 +133,18 @@ The AI raised two questions before writing any code:
 | A revision without components carries over the recurring components only | A one-time payment belongs to the version it was recorded in; copying it forward would count it twice in its payout year. |
 | Carried-over fixed amounts keep their original currency | A transfer must restate allowances in the new currency. Otherwise ₹30,000 would silently become €30,000. |
 | Before their start date, a future hire shows the role and country of their first version, with no current package | They still appear in the directory with the right role and country. |
-| Termination dates must fall between the hire date and today | This avoids terminated-but-still-working employees. It interacts with the rejection above (see the PR's open question). |
+| ~~Termination dates must fall between the hire date and today~~ | Replaced on review (see below). |
 | Directory band filter in SQL, display values from the domain | SQL is needed to filter and count. A parametrised test checks the SQL position matches the domain comparison for every position. |
+
+### Candidate's decision on review: future termination dates
+
+The AI pointed out that three rules together made some employees impossible to terminate: "reject a termination with a pending change after it", "no future termination dates" and "versions can't be withdrawn". Anyone with a pending raise could only be terminated after the raise took effect. The candidate chose to **allow future termination dates**:
+
+- Terminating records the last day worked and nothing else.
+- Status is worked out from that date at read time (`status_on` in the domain, and the same rule in the directory query). The employee counts as terminated from the day after, with no job needed to flip the status.
+- HR can date a termination on or after a pending change.
+- A pay change dated after the last day is rejected with `CHANGE_AFTER_TERMINATION`.
+- `EmployeeService` no longer needed its clock, so the AI removed that dependency.
 
 ### Corrections during the phase
 

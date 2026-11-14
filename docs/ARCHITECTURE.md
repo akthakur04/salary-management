@@ -121,7 +121,7 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 | `GET /employees/{id}` | Profile + current package + band comparison. |
 | `POST /employees` | Hire: creates the employee + first version (role defaults applied, overridable). |
 | `PATCH /employees/{id}` | Update non-compensation details. |
-| `POST /employees/{id}/terminate` | Ends employment: sets status + termination date, and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
+| `POST /employees/{id}/terminate` | Ends employment: records the last day worked (which may be in the future; status is derived from it at read time) and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
 | `GET /employees/{id}/compensation` | Full version history. |
 | `POST /employees/{id}/compensation` | New version (raise, promotion, correction) with `effective_from` + `reason`. |
 | `GET /employees/export.csv` | CSV of the current filtered list (S4). |
