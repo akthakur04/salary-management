@@ -8,6 +8,7 @@ venv/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+*.egg-info/
 
 # Node / frontend
 node_modules/
