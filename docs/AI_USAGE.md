@@ -234,10 +234,11 @@ The AI pointed out that three rules together made some employees impossible to t
 - **Over budget:** the first timing put the insight endpoints at about 290 ms p95, two over the 300 ms budget. Profiling found ORM objects built for 10,000 read-only rows (~65 ms extra) and an FX table per row (~45 ms). Plain columns and one rate set per request brought them to about 240 ms. The SQL itself was already fully indexed (`EXPLAIN QUERY PLAN`).
 - **Code left unfinished:** the AI's first insights service had a placeholder method that raised `NotImplementedError`, plus an unused parameter. The router used an `__import__` hack, and two percentages used float `round()`. All four were fixed before commit, and a shared `share_percent` was added to the domain, with tests, so every percentage rounds half-to-even.
 - **Methods named `list`:** they hid Python's built-in `list` in later type annotations. They were renamed to `search`.
+- **A real bug found by chasing coverage:** `update_details` set the new email on the session object before validating the FTE. A rejected edit left the change pending, and the next commit on that session saved it. A failing test showed it, and the fix validates everything before changing the row. The other write paths were checked, and they change rows only inside their transaction.
 
 ### How the output was verified
 
-- 353 backend tests pass in about 5 s. The domain stays at 100% coverage. ruff, the format check, mypy (strict, now also on `scripts/`) and all hooks pass.
+- 361 backend tests pass. Coverage is 99% overall. The domain stays at 100% coverage. ruff, the format check, mypy (strict, now also on `scripts/`) and all hooks pass.
 - Auth tests cover the cookie attributes, case-insensitive email, a wrong password matching an unknown email, missing / expired / tampered / wrongly-signed sessions, logout, and refusing to start without settings. The route-table test covers all 20 protected routes.
 - The preview test reproduces the demo scenario: promoting Ravi to L4 at ₹26,88,000 shows total pay ₹34,77,600, +12.0%, **below band by ₹1,12,000**, and saves nothing.
 - Timings against the full seed are in `docs/PERFORMANCE.md`. Every budgeted endpoint is within 300 ms p95: directory and profile at 2–22 ms, insights at about 230–260 ms.
