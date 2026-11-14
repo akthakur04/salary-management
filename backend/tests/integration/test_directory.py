@@ -192,6 +192,24 @@ def test_terminated_employees_are_excluded_by_default(directory: DirectoryServic
     assert _names(leavers.items) == ["Old Timer"]
 
 
+def test_employee_leaving_in_the_future_is_listed_until_their_last_day(
+    session: Session, reference: Reference, clock: FixedClock, directory: DirectoryService
+) -> None:
+    neha = directory.list(EmployeeQuery(q="Neha")).items[0].record.id
+    EmployeeService(session, clock).terminate(neha, date(2026, 12, 31))
+
+    on_last_day = directory.list(EmployeeQuery(q="Neha"), as_of=date(2026, 12, 31))
+    day_after = directory.list(EmployeeQuery(q="Neha"), as_of=date(2027, 1, 1))
+    leavers = directory.list(
+        EmployeeQuery(statuses=(EmploymentStatus.TERMINATED,)), as_of=date(2027, 1, 1)
+    )
+
+    assert on_last_day.items[0].record.status is EmploymentStatus.ACTIVE
+    assert day_after.items == ()
+    assert "Neha Gupta" in _names(leavers.items)
+    assert leavers.items[-1].record.status is EmploymentStatus.TERMINATED
+
+
 def test_employee_without_a_package_is_listed_without_one(directory: DirectoryService) -> None:
     priya = _find(directory, "Priya")
 

@@ -201,7 +201,7 @@ def test_revising_an_unknown_employee_is_rejected(session: Session, reference: R
     assert raised.value.code == "EMPLOYEE_NOT_FOUND"
 
 
-def test_revising_a_terminated_employee_is_rejected(
+def test_change_after_the_last_day_of_employment_is_rejected(
     session: Session, reference: Reference, clock: FixedClock
 ) -> None:
     employee_id = _hire_ravi(session, reference, clock)
@@ -210,7 +210,18 @@ def test_revising_a_terminated_employee_is_rejected(
     with pytest.raises(ConflictError) as raised:
         CompensationService(session).revise(employee_id, _merit(date(2026, 11, 1), 25_00_000))
 
-    assert raised.value.code == "EMPLOYEE_TERMINATED"
+    assert raised.value.code == "CHANGE_AFTER_TERMINATION"
+
+
+def test_change_before_a_future_last_day_is_allowed(
+    session: Session, reference: Reference, clock: FixedClock
+) -> None:
+    employee_id = _hire_ravi(session, reference, clock)
+    EmployeeService(session, clock).terminate(employee_id, date(2027, 1, 31))
+
+    CompensationService(session).revise(employee_id, _merit(date(2027, 1, 1), 25_00_000))
+
+    assert len(CompensationRepository(session).history(employee_id)) == 2
 
 
 def _employee_without_a_package(session: Session) -> int:
