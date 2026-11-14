@@ -116,7 +116,7 @@ export default function EmployeePage({ params }: { params: Promise<{ id: string 
         <Link href="/employees">Employees</Link> / <span>{profile.name}</span>
       </nav>
       <Header profile={profile} />
-      <PendingNotice profile={profile} />
+      {profile.package ? <PendingNotice profile={profile} /> : null}
       {profile.package ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(400px,1fr))] gap-5">
           <PackagePanel profile={profile} pkg={profile.package} defaults={defaults} />
@@ -126,7 +126,7 @@ export default function EmployeePage({ params }: { params: Promise<{ id: string 
         <EmptyState
           title="No salary package in force"
           action={
-            profile.status !== "terminated" ? (
+            profile.status !== "terminated" && profile.pending_changes.length === 0 ? (
               <Button asChild size="sm">
                 <Link href={`/employees/${profile.id}/revise`} className="text-primary-foreground">
                   Record a package
@@ -136,7 +136,7 @@ export default function EmployeePage({ params }: { params: Promise<{ id: string 
           }
         >
           {profile.pending_changes.length
-            ? "Their first package starts on a future date. It's listed in the history below."
+            ? `Their first package starts on ${formatDate(profile.pending_changes[0].effective_from)}. It's listed in the history below.`
             : "This person is left out of pay averages until a package is recorded."}
         </EmptyState>
       )}
