@@ -17,7 +17,7 @@ from app.models import Employee
 from app.repositories.compensation import CompensationRepository
 from app.repositories.employees import EmployeeRepository
 from app.repositories.reference import ReferenceRepository
-from app.services.inputs import HireRequest
+from app.services.inputs import DetailsUpdate, HireRequest
 from app.services.lookups import (
     require_country_currency,
     require_employee,
@@ -114,3 +114,39 @@ class EmployeeService:
 
         with transaction(self._session):
             employee.termination_date = termination_date
+
+    def update_details(self, employee_id: int, changes: DetailsUpdate) -> None:
+        """Change non-compensation details. Termination has its own use case."""
+        employee = require_employee(self._employees, employee_id)
+        if changes.status is EmploymentStatus.TERMINATED:
+            raise InvalidRequestError(
+                "Use terminate to end employment, so the last day is recorded.",
+                code="USE_TERMINATE",
+            )
+        # Validate everything before touching the row: a half-applied change would
+        # stay in the session and be saved by the next commit.
+        email = employee.email
+        if changes.email is not None:
+            identity = EmployeeIdentity(employee.employee_code, changes.email)
+            others = [
+                other
+                for other in self._employees.identities_matching(identity)
+                if other.employee_code != employee.employee_code
+            ]
+            ensure_unique_identity(identity, others)
+            email = identity.email
+        employment_type = changes.employment_type or employee.employment_type
+        fte = changes.fte if changes.fte is not None else employee.fte
+        validate_fte(employment_type, fte)
+
+        try:
+            with transaction(self._session):
+                employee.email = email
+                employee.employment_type = employment_type
+                employee.fte = fte
+                if changes.name is not None:
+                    employee.name = changes.name.strip()
+                if changes.status is not None:
+                    employee.status = changes.status
+        except IntegrityError as error:
+            raise DuplicateEmployeeError("Another employee already uses this email.") from error

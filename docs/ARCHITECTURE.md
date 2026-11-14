@@ -117,22 +117,26 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 
 | Method & path | Purpose |
 |---|---|
-| `GET /employees` | Paginated list. `page`, `page_size` (≤ 100), `sort`, `q` (name/code search), filters: `country`, `department`, `role`, `level`, `employment_type`, `status`, `band_position`. Returns `{items, total, page, page_size}`. |
-| `GET /employees/{id}` | Profile + current package + band comparison. |
-| `POST /employees` | Hire: creates the employee + first version (role defaults applied, overridable). |
-| `PATCH /employees/{id}` | Update non-compensation details. |
+| `GET /employees` | Paginated list. `page`, `page_size` (≤ 100), `sort` (`name`, `employee_code`, `base`, `total_pay_usd`, `compa_ratio`, `last_change`), `order`, `q` (name/code prefix), filters: `country`, `department`, `role`, `level`, `employment_type`, `status` (default: active and on leave), `band_position`, `as_of`. Returns `{items, total, page, page_size}`. |
+| `GET /employees/export.csv` | CSV of the same filtered list, all pages (S4). Amounts in major units; formula-like text neutralised. |
+| `GET /employees/{id}` | Profile: current package with components, totals in local currency and USD, variable share, band comparison with the band range, peers in role and country (count, median FTE-equivalent base), pending changes, one-time payments. Accepts `as_of`. |
+| `POST /employees` | Hire: creates the employee + first version (role defaults unless `components` are given). Returns the profile, `201` + `Location`. |
+| `PATCH /employees/{id}` | Update non-compensation details (name, email, employment type, FTE, active / on leave). |
 | `POST /employees/{id}/terminate` | Ends employment: records the last day worked (which may be in the future; status is derived from it at read time) and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
-| `GET /employees/{id}/compensation` | Full version history. |
-| `POST /employees/{id}/compensation` | New version (raise, promotion, correction) with `effective_from` + `reason`. |
-| `GET /employees/export.csv` | CSV of the current filtered list (S4). |
-| `GET /insights/summary` | Headcount, total TTC (USD), fixed/variable mix, bonus-eligibility rate. |
-| `GET /insights/breakdown` | `group_by=country|department|level`, optional filters → count, min/median/mean/max. |
-| `GET /insights/band-distribution` | Below / in / above band counts by group. |
-| `GET /insights/exceptions` | Out of band, missing package, pending future changes. |
-| `GET /reference/{countries,departments,roles,pay-bands}` | Dropdown data. |
-| `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management (see §5a). Every other endpoint requires a session. |
+| `GET /employees/{id}/compensation` | Full version history, newest first, each with its state (`current`, `pending`, `past`, `superseded`) and raise % in local currency. |
+| `POST /employees/{id}/compensation` | New version (raise, promotion, transfer, correction) with `effective_from` + `reason`. Returns the new history entry, `201`. |
+| `POST /employees/{id}/compensation/preview` | Dry run of the above: before → after, band position against the new role's band, raise %, USD, whether it takes effect later. Runs the same checks as a save; writes nothing (decision Q2). |
+| `GET /insights/summary` | Headcount, joiners and leavers this quarter, total and median pay (USD), % paid within band, bonus-eligibility rate, variable share, employees without a package. |
+| `GET /insights/breakdown` | `group_by=country\|department\|level` (contractors grouped separately), optional `country` / `department` / `level` filters → headcount, min/median/mean/max in USD, variable share. |
+| `GET /insights/band-distribution` | Below / in / above band counts and % in band, by group. Contractors left out. |
+| `GET /insights/exceptions` | Counts for below band, above band, changes due in the next 60 days and missing packages (the sidebar badge is their total), plus a page of one `type`, largest gap first. |
+| `GET /insights/recent-changes` | The latest recorded changes (not hires), newest first, with raise % and whether pending. `limit` (default 5). |
+| `GET /reference/{countries,departments,roles,pay-bands}` | Dropdown data; roles include their default components. |
+| `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management (see §5a). Every other endpoint except `GET /health` requires a session. |
 
-**Errors** use one consistent shape, `{ "error": { "code": "OVERLAPPING_VERSION", "message": "...", "details": {...} } }`. Domain exceptions map to 400/404/409/422 in a single handler, so routers have no try/except clutter. A missing, expired, or tampered session returns **401** (`UNAUTHENTICATED`), and the UI responds by redirecting to `/login`.
+Money is returned as `{"amount_minor": 240000000, "currency": "INR"}`. Decimals (FTE, percentages, compa-ratio) are fixed-precision strings such as `"0.89"`, so clients never parse floats and SQLite and Postgres return the same text.
+
+**Errors** use one consistent shape, `{ "error": { "code": "OVERLAPPING_VERSION", "message": "...", "details": {...} } }`. Domain exceptions map to 409 (a clash with stored data: overlapping versions, duplicates) or 422 (a broken rule) in a single handler, so routers have no try/except clutter. A missing, expired, or tampered session returns **401** (`UNAUTHENTICATED`), and the UI responds by redirecting to `/login`.
 
 **Pagination:** offset/limit. At 10k rows offset cost is negligible, and keyset pagination would complicate arbitrary sorting for no benefit.
 
@@ -159,12 +163,12 @@ sequenceDiagram
 |---|---|
 | Credentials | `HR_ADMIN_EMAIL` and `HR_ADMIN_PASSWORD_HASH` (bcrypt) as backend env vars. No users table. The plain password is never stored, and a helper script generates the hash. |
 | Session | Signed JWT (`SESSION_SECRET`, HS256, 8-hour expiry) in an **HttpOnly, Secure, SameSite=Lax** cookie. JavaScript can't read it, which limits XSS impact. |
-| Enforcement | **FastAPI is the real gate:** a single `require_session` dependency on every router except `/auth/login`. Next.js `middleware.ts` only checks that the cookie exists and redirects to `/login`, for UX. |
+| Enforcement | **FastAPI is the real gate:** a single `require_session` dependency on every router except `/auth/login` and `/health` (the hosting platform's health check can't send a cookie, and health exposes no salary data). Next.js `middleware.ts` only checks that the cookie exists and redirects to `/login`, for UX. |
 | Same-origin | Because Next.js proxies `/api/*`, the cookie is first-party, with no cross-site cookie or CORS configuration. |
 | Failure handling | Generic "invalid email or password" message (no account enumeration); constant-time comparison. |
 | Not included (yet) | Rate limiting / lockout, password reset, multiple users, roles. Noted as next steps. |
 
-Tests cover the happy path, wrong password, missing or expired or tampered cookie → 401, and that every protected router has the dependency attached (a single test walks the route table).
+Tests cover the happy path, wrong password, missing or expired or tampered cookie → 401, and a single test walks the route table (from the OpenAPI schema) and sends every route except login and health a request without a session, expecting 401. The app refuses to start without a complete login configuration.
 
 ## 6. Performance at 10k employees
 

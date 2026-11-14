@@ -139,4 +139,13 @@ Every edge case has at least one named test. Domain tests are in [`backend/tests
 | E24 | Duplicate code or email | `test_identity.py::test_duplicate_employee_code_is_rejected`, `test_identity.py::test_duplicate_email_is_rejected_ignoring_case` |
 | E25 | Missing FX rate | `test_fx.py::test_missing_fx_rate_fails_loudly_instead_of_returning_zero`, `test_fx.py::test_rate_set_must_cover_every_currency_in_use` |
 
-Later phases add tests where an edge case also needs the database or the API: unique indexes (E24) and one open version per employee (E16) in Phase 3; contractors counted in cost (E10), terminated employees excluded by default (E11), and missing packages listed in Exceptions (E13) in Phase 5.
+Where an edge case also depends on the database or the API, these tests cover that side:
+
+| # | Database / API side | Test(s) |
+|---|---|---|
+| E10 | Contractors counted in cost, left out of band figures | `tests/api/test_insights.py::test_summary_reports_the_overview_kpis`, `::test_band_distribution_leaves_out_unbanded_staff` |
+| E11 | Terminated employees left out by default, listable | `tests/integration/test_directory.py::test_terminated_employees_are_excluded_by_default`, `::test_employee_leaving_in_the_future_is_listed_until_their_last_day` |
+| E13 | Missing packages counted in headcount, listed in Exceptions, left out of pay figures | `tests/api/test_insights.py::test_employee_without_a_package_counts_in_headcount_but_not_in_pay`, `::test_missing_package_exceptions_list_the_employee` |
+| E14 | Pending changes due within 60 days listed in Exceptions | `tests/api/test_insights.py::test_pending_exceptions_show_base_today_and_the_new_base` |
+| E16 | One open version per employee, enforced by a partial unique index | `tests/integration/test_schema.py::test_database_allows_only_one_open_version_per_employee` |
+| E24 | Unique employee code and email in the database and the API | `tests/integration/test_schema.py::test_database_rejects_a_duplicate_employee_code_or_email`, `tests/api/test_employees.py::test_hire_with_a_duplicate_code_is_a_conflict` |

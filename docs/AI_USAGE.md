@@ -204,3 +204,42 @@ The AI pointed out that three rules together made some employees impossible to t
   A separate test generates the full 10,000.
 - The loader tests check that the data loads completely, that a second run changes nothing, that `--reset` reloads identical data, that the first 50 histories read back exactly as generated, and that the directory shows Ravi at compa-ratio 0.89 and $36,316.80.
 - The real command was run against a migrated SQLite file several times: 10,000 employees, 26,776 versions and 32,249 components in about 1.5 s per load.
+
+## Phase 5: API and authentication
+
+- **Prompt:** "Merged, start Phase 5". The work branched from `dev`, and its PR targets `dev`.
+- **Output:**
+  - **Auth:** bcrypt check, HS256 JWT in an HttpOnly / Secure / SameSite=Lax cookie, one `require_session` dependency, a start-up check of the login settings, and `python -m app.core.hash_password`.
+  - **Errors:** domain errors mapped to 409 or 422.
+  - **Endpoints:** reference data; employees (list, CSV export, profile, history, hire, edit, terminate, revise, preview); insights (summary, breakdown, band distribution, exceptions, recent changes).
+  - **Performance:** a timing script and `PERFORMANCE.md`.
+- **Test-first:** auth, error mapping, reference, employee and insight endpoints were each committed as failing tests before the implementation.
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| Login failures return `INVALID_CREDENTIALS` (401) with the design's copy; a missing, expired or tampered session returns `UNAUTHENTICATED` | Both are 401. The distinct code lets the UI show the login error in place, instead of redirecting to the login page it's already on. A wrong email and a wrong password get identical responses, and bcrypt always runs. |
+| `GET /health` is public | The hosting platform's health check can't send a cookie, and health exposes no salary data. This was noted in Phase 1 and is now in ARCHITECTURE §5a. |
+| The app refuses to start without a complete login configuration | A misconfigured deploy fails at start-up instead of at the first login attempt. |
+| Decimals are fixed-precision strings (`"0.89"`, `"15.00"`) | SQLite read back `15` and Postgres `15.00`. Fixed formatting makes the API identical on both, and clients never parse floats. |
+| `recent-changes` takes `limit`, not `days` | Seeded versions all share one `created_at`, so a "last 7 days" window would return either nothing or everything. The endpoint lists the latest recorded changes (newest first), which is what the Overview panel shows. |
+| Peers are current full- and part-time employees in the same role and country, compared on FTE-equivalent base; contractors are left out | It matches how bands are compared. |
+| CSV text starting with `=`, `+`, `-` or `@` is prefixed with `'` | HR opens the export in Excel, and a crafted name shouldn't run as a formula. |
+| Insights compute from all current employees in Python, reusing the tested directory query | It's one source of truth for band position and USD, and fast enough at 10k (see below). Pushing aggregates into SQL is documented as the next step. |
+
+### Corrections during the phase
+
+- **The route-table walk found nothing:** the first route-table test listed zero routes. FastAPI 0.162 mounts included routers lazily, so `app.routes` no longer lists endpoints. Rather than depend on private internals, the test walks the OpenAPI schema (a public, complete list of paths and methods) and sends every protected route a cookie-less request. The AI checked that the test fails by adding an unprotected route in memory.
+- **Over budget:** the first timing put the insight endpoints at about 290 ms p95, two over the 300 ms budget. Profiling found ORM objects built for 10,000 read-only rows (~65 ms extra) and an FX table per row (~45 ms). Plain columns and one rate set per request brought them to about 240 ms. The SQL itself was already fully indexed (`EXPLAIN QUERY PLAN`).
+- **Code left unfinished:** the AI's first insights service had a placeholder method that raised `NotImplementedError`, plus an unused parameter. The router used an `__import__` hack, and two percentages used float `round()`. All four were fixed before commit, and a shared `share_percent` was added to the domain, with tests, so every percentage rounds half-to-even.
+- **Methods named `list`:** they hid Python's built-in `list` in later type annotations. They were renamed to `search`.
+- **A real bug found by chasing coverage:** `update_details` set the new email on the session object before validating the FTE. A rejected edit left the change pending, and the next commit on that session saved it. A failing test showed it, and the fix validates everything before changing the row. The other write paths were checked, and they change rows only inside their transaction.
+
+### How the output was verified
+
+- 361 backend tests pass. Coverage is 99% overall. The domain stays at 100% coverage. ruff, the format check, mypy (strict, now also on `scripts/`) and all hooks pass.
+- Auth tests cover the cookie attributes, case-insensitive email, a wrong password matching an unknown email, missing / expired / tampered / wrongly-signed sessions, logout, and refusing to start without settings. The route-table test covers all 20 protected routes.
+- The preview test reproduces the demo scenario: promoting Ravi to L4 at ₹26,88,000 shows total pay ₹34,77,600, +12.0%, **below band by ₹1,12,000**, and saves nothing.
+- Timings against the full seed are in `docs/PERFORMANCE.md`. Every budgeted endpoint is within 300 ms p95: directory and profile at 2–22 ms, insights at about 230–260 ms.
+- **Smoke test:** a real `uvicorn` server with a `.env` holding a freshly generated hash. A request without a cookie and a wrong password each got 401, login set the expected cookie, and the summary and directory returned the seeded figures (Ravi at compa-ratio 0.89).

@@ -22,6 +22,11 @@ class AppError(Exception):
         self.details = details or {}
 
 
+class UnauthenticatedError(AppError):
+    status_code = 401
+    default_code = "UNAUTHENTICATED"
+
+
 class NotFoundError(AppError):
     status_code = 404
     default_code = "NOT_FOUND"

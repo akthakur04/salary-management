@@ -1,9 +1,17 @@
 """Every error leaves the API in one shape: {"error": {"code", "message", "details"}}."""
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.core.errors import NotFoundError
+from app.domain.errors import (
+    CurrencyCountryMismatchError,
+    DomainError,
+    DuplicateEmployeeError,
+    InvalidPercentageError,
+    OverlappingVersionError,
+)
 
 
 def _add_route_raising(app: FastAPI, error: Exception) -> None:
@@ -93,3 +101,26 @@ def test_unexpected_error_returns_500_without_leaking_internals(app: FastAPI) ->
         }
     }
     assert "hunter2" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code"),
+    [
+        (OverlappingVersionError("Overlaps.", effective_from="2024-10-01"), 409),
+        (DuplicateEmployeeError("Taken.", field="email"), 409),
+        (InvalidPercentageError("Enter 0-100.", percent="150"), 422),
+        (CurrencyCountryMismatchError("Wrong currency."), 422),
+    ],
+)
+def test_domain_rule_violations_use_their_code_and_a_fitting_status(
+    app: FastAPI, error: DomainError, status_code: int
+) -> None:
+    _add_route_raising(app, error)
+    client = TestClient(app)
+
+    response = client.get("/api/v1/_test/raise")
+
+    assert response.status_code == status_code
+    assert response.json() == {
+        "error": {"code": error.code, "message": error.message, "details": error.details}
+    }

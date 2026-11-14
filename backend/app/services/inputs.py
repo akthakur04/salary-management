@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.domain.components import ComponentBasis, ComponentType, Frequency
-from app.domain.employment import EmploymentType
+from app.domain.employment import EmploymentStatus, EmploymentType
 from app.domain.versions import ChangeReason
 
 
@@ -54,3 +54,14 @@ class RevisionRequest:
     country_code: str | None = None
     components: tuple[ComponentInput, ...] | None = None
     note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DetailsUpdate:
+    """Non-compensation details. Fields left as None are unchanged."""
+
+    name: str | None = None
+    email: str | None = None
+    employment_type: EmploymentType | None = None
+    fte: Decimal | None = None
+    status: EmploymentStatus | None = None

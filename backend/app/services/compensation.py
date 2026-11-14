@@ -1,13 +1,23 @@
 """Use case: revise an employee's compensation (raise, promotion, transfer, correction)."""
 
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
 from app.core.errors import ConflictError
 from app.domain.employment import EmploymentStatus
 from app.domain.money import Money
 from app.domain.package import CompensationPackage
-from app.domain.versions import CompensationChange, CompensationVersion, plan_revision
-from app.repositories.compensation import CompensationRepository
+from app.domain.versions import (
+    CompensationChange,
+    CompensationVersion,
+    RevisionPlan,
+    plan_revision,
+)
+from app.models import Employee
+from app.repositories.compensation import CompensationRepository, StoredVersion
 from app.repositories.employees import EmployeeRepository
 from app.repositories.reference import ReferenceRepository
 from app.services.inputs import RevisionRequest
@@ -18,6 +28,15 @@ from app.services.lookups import (
     to_components,
 )
 from app.services.transactions import transaction
+from app.services.views import VersionView, Views, change_percent
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionPreview:
+    before: VersionView | None
+    after: VersionView
+    base_change_percent: Decimal | None
+    takes_effect_later: bool
 
 
 class CompensationService:
@@ -32,6 +51,32 @@ class CompensationService:
 
         Returns the new version's id.
         """
+        _, stored, plan = self._plan(employee_id, request)
+        with transaction(self._session):
+            if plan.closed_previous is not None:
+                assert plan.closed_previous.effective_to is not None
+                self._compensation.close(stored[-1].id, plan.closed_previous.effective_to)
+            return self._compensation.add(employee_id, plan.new_version, request.note)
+
+    def preview(self, employee_id: int, request: RevisionRequest, as_of: date) -> RevisionPreview:
+        """What `revise` would save, with band position and USD, without saving anything.
+
+        Runs the same checks as `revise`, so a preview fails exactly when a save would.
+        """
+        employee, stored, plan = self._plan(employee_id, request)
+        views = Views(self._reference)
+        before = stored[-1].version if stored else None
+        after = plan.new_version
+        return RevisionPreview(
+            before=views.version(employee, before) if before else None,
+            after=views.version(employee, after),
+            base_change_percent=change_percent(before, after),
+            takes_effect_later=after.effective_from > as_of,
+        )
+
+    def _plan(
+        self, employee_id: int, request: RevisionRequest
+    ) -> tuple[Employee, tuple[StoredVersion, ...], RevisionPlan]:
         employee = require_employee(self._employees, employee_id)
         last_day = employee.termination_date
         if employee.status is EmploymentStatus.TERMINATED or (
@@ -44,16 +89,8 @@ class CompensationService:
             )
         stored = self._compensation.history(employee_id)
         history = tuple(entry.version for entry in stored)
-        latest = history[-1] if history else None
-
-        change = self._change_from(request, latest)
-        plan = plan_revision(history, change, change.package.currency)
-
-        with transaction(self._session):
-            if plan.closed_previous is not None:
-                assert plan.closed_previous.effective_to is not None
-                self._compensation.close(stored[-1].id, plan.closed_previous.effective_to)
-            return self._compensation.add(employee_id, plan.new_version, request.note)
+        change = self._change_from(request, history[-1] if history else None)
+        return employee, stored, plan_revision(history, change, change.package.currency)
 
     def _change_from(
         self, request: RevisionRequest, latest: CompensationVersion | None

@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from app.core.errors import AppError
+from app.domain.errors import DomainError, DuplicateEmployeeError, OverlappingVersionError
 from app.schemas.errors import ErrorBody, ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,20 @@ def _error_response(
 async def _handle_app_error(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)
     return _error_response(exc.status_code, exc.code, exc.message, exc.details)
+
+
+# A domain rule broken by the request's content is 422; a clash with stored data is 409.
+_CONFLICTING_DOMAIN_ERRORS = (OverlappingVersionError, DuplicateEmployeeError)
+
+
+async def _handle_domain_error(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, DomainError)
+    status_code = (
+        status.HTTP_409_CONFLICT
+        if isinstance(exc, _CONFLICTING_DOMAIN_ERRORS)
+        else status.HTTP_422_UNPROCESSABLE_CONTENT
+    )
+    return _error_response(status_code, exc.code, exc.message, exc.details)
 
 
 async def _handle_validation_error(_: Request, exc: Exception) -> JSONResponse:
@@ -69,6 +84,7 @@ async def _handle_unexpected_error(request: Request, exc: Exception) -> JSONResp
 
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, _handle_app_error)
+    app.add_exception_handler(DomainError, _handle_domain_error)
     app.add_exception_handler(RequestValidationError, _handle_validation_error)
     app.add_exception_handler(HTTPException, _handle_http_exception)
     app.add_exception_handler(Exception, _handle_unexpected_error)
