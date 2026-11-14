@@ -170,3 +170,11 @@ def test_ravi_kumar_matches_the_profile_design(sample: SeedData) -> None:
 
 def test_ravi_kumar_appears_exactly_once(sample: SeedData) -> None:
     assert [e.name for e in sample.employees].count("Ravi Kumar") == 1
+
+
+def test_full_data_set_has_10000_employees_and_about_25000_versions() -> None:
+    data = generate()
+
+    assert len(data.employees) == 10_000
+    assert sum(len(employee.versions) for employee in data.employees) > 24_000
+    assert sum(1 for employee in data.employees if not employee.versions) == 12

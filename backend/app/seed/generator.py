@@ -52,7 +52,7 @@ LATEST_PAST_HIRE = date(2026, 10, 30)
 MISSING_PACKAGE_EVERY = 833
 FUTURE_HIRE_EVERY = 500
 PART_TIME_FTES = (Decimal("0.5"), Decimal("0.6"), Decimal("0.75"), Decimal("0.8"))
-VERSION_COUNT_WEIGHTS = {1: 25, 2: 35, 3: 25, 4: 15}
+VERSION_COUNT_WEIGHTS = {1: 10, 2: 20, 3: 35, 4: 35}
 
 RAVI_CODE = "EMP-04821"
 
@@ -307,7 +307,7 @@ class _Employee:
             if gets_sign_on:
                 hire_base = Decimal(profile.steps[0].base_units)
                 profile.sign_on_units = _round_to(
-                    hire_base * Decimal(str(rng.uniform(0.05, 0.10))), 1000
+                    hire_base * Decimal(str(rng.uniform(0.05, 0.10))), 100
                 )
             versions = _versions(profile, self.architecture)
 
