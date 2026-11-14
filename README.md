@@ -2,7 +2,7 @@
 
 Salary management for an HR Manager looking after 10,000 employees across 8 countries: full salary packages (base, allowances, bonus, commission, one-time payments), effective-dated history, pay bands, and insights into how the organisation pays people.
 
-> **Status:** in progress. The backend foundation, the domain layer (all salary rules, edge cases E1–E25), persistence (schema, migrations, hire / revise / terminate, the employee directory query) the 10,000-employee demo seed and the REST API with the HR login are in place; the frontend and deployment follow.
+> **Status:** in progress. The backend foundation, the domain layer (all salary rules, edge cases E1–E25), persistence (schema, migrations, hire / revise / terminate, the employee directory query), the 10,000-employee demo seed, the REST API with the HR login, and the Next.js frontend (all seven screens plus hiring) are in place; deployment follows.
 
 ## Docs
 
@@ -51,4 +51,32 @@ ruff check .
 ruff format --check .
 mypy
 pytest
+```
+
+## Frontend
+
+Next.js 15 (App Router) with TypeScript, shadcn/ui (Radix + Tailwind), TanStack Query and Table, React Hook Form + Zod, and Recharts via shadcn charts. It's light theme only.
+
+### Run locally
+
+Start the backend first (see above), then:
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local   # API_ORIGIN points at the backend
+npm run dev
+```
+
+Open http://localhost:3000 and sign in with the `HR_ADMIN_EMAIL` and password you set for the backend. The browser only talks to Next.js, which proxies `/api/*` to FastAPI, so there's no CORS and the session cookie stays first-party.
+
+### Checks
+
+Run from `frontend/`; CI runs the same commands.
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```

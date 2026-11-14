@@ -189,25 +189,26 @@ Tests cover the happy path, wrong password, missing or expired or tampered cooki
 ```
 frontend/
 ├── app/                      # Next.js App Router
-│   ├── layout.tsx            # root layout, providers (TanStack Query)
-│   ├── login/                # public login page
-│   ├── (app)/                # authenticated shell: sidebar + header
-│   │   ├── page.tsx          # Overview (insights + exceptions summary)
-│   │   ├── employees/        # directory, [id] profile, [id]/revise, new (hire)
-│   │   ├── insights/
-│   │   └── exceptions/
+│   ├── layout.tsx            # fonts (Geist, Geist Mono) and providers
+│   ├── providers.tsx         # TanStack Query client, toasts, tooltips
+│   ├── login/                # public sign-in page
+│   └── (app)/                # signed-in shell: sidebar + header with ⌘K search
+│       ├── page.tsx          # Overview
+│       ├── employees/        # directory, new (hire), [id] profile, [id]/revise
+│       ├── exceptions/
+│       └── insights/
 ├── components/
 │   ├── ui/                   # shadcn/ui components (owned, generated into repo)
-│   └── ...                   # shared: Money, BandIndicator, EmptyState, ErrorState
-├── features/                 # feature modules: employees, insights, exceptions
-├── lib/                      # api client + query hooks, formatting, Zod schemas
-├── middleware.ts             # redirect to /login when no session cookie
-└── next.config.ts            # rewrites /api/* → FastAPI
+│   └── ...                   # shared: app shell, band status, band gauge, states
+├── features/                 # per-screen pieces: employees, profile, revise, insights
+├── lib/                      # API client, query hooks, formatting, URL filters, Zod schemas, types
+├── middleware.ts             # redirect to /login when there's no session cookie
+└── next.config.ts            # rewrites /api/* → FastAPI (API_ORIGIN)
 ```
 
-**Client vs. server components:** pages are thin server components that render the shell; interactive parts (data table, forms, charts) are client components that fetch through TanStack Query. FastAPI stays the single source of business logic, and Next.js doesn't duplicate it.
+**Client components, server logic.** The signed-in pages are client components that fetch through TanStack Query; the session cookie is HttpOnly, so only the browser can send it. FastAPI stays the single source of business logic: the revise page's live preview calls the server's dry-run endpoint rather than recomputing pay in TypeScript, and band position, USD and totals always come from the API. The frontend only formats, validates forms for fast feedback (mirroring the server's rules in Zod), and keeps view state in the URL.
 
-Pages: **Overview** · **Directory** → **Employee profile** (package, band gauge, history timeline) → **Revise compensation** (full page at `/employees/[id]/revise`: form + live preview side by side, then an inline confirm step) · **Insights** · **Exceptions**. URL search params hold the filters, so views can be bookmarked and shared.
+Pages: **Overview** · **Directory** → **Employee profile** (package, band gauge, history timeline) → **Revise compensation** (full page at `/employees/[id]/revise`: form + live preview side by side, then an inline confirm step) · **Insights** · **Exceptions** · **Add employee** (`/employees/new`). URL search params hold the directory filters, sort and page, the Exceptions tab and the Insights grouping, so views can be bookmarked and shared.
 
 ## 8. Testing strategy
 
@@ -216,7 +217,7 @@ Pages: **Overview** · **Directory** → **Employee profile** (package, band gau
 | **Domain unit** | Calculations, Money, validation, overlap rules, every edge case E1–E25 | Pure pytest, no DB, table-driven (`parametrize`) | Most tests |
 | **Service / repository** | Transactions, filters, aggregates, current-version selection | pytest + in-memory SQLite, fixture factories, pinned clock | Some |
 | **API** | Status codes, contracts, error shape | `TestClient` against in-memory DB | Some |
-| **Frontend** | Form validation, table/filter wiring, money formatting | Vitest + RTL with mocked API hooks | Few, focused |
+| **Frontend** | Form validation (Zod rules and the login form), filter ↔ URL wiring, money formatting, band-status rendering, the revise request and confirmation sentence | Vitest + RTL, with `fetch` and Next.js navigation mocked | Few, focused |
 
 Principles: **fast** (whole backend suite in seconds), **deterministic** (fixed clock, fixed FX, seeded random), **readable** (Arrange-Act-Assert, names describe behaviour, e.g. `test_part_time_employee_is_compared_to_band_at_fte`). Domain logic is developed **test-first**, and commits show test → implementation pairs.
 
