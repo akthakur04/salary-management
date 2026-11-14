@@ -72,9 +72,9 @@ backend/app/
 
 ```mermaid
 erDiagram
-    COUNTRY ||--o{ EMPLOYEE : employs
+    COUNTRY ||--o{ COMPENSATION_VERSION : "paid in"
     DEPARTMENT ||--o{ ROLE : contains
-    ROLE ||--o{ EMPLOYEE : holds
+    ROLE ||--o{ COMPENSATION_VERSION : "held as"
     ROLE ||--o{ ROLE_DEFAULT_COMPONENT : "default structure"
     ROLE ||--o{ PAY_BAND : "banded per country"
     COUNTRY ||--o{ PAY_BAND : ""
@@ -89,10 +89,10 @@ erDiagram
 | `fx_rate` | `currency`, `usd_per_unit` (decimal), `rate_set`, `is_active` | Fixed, versioned reference rates. Exactly one rate set is active, and all USD figures use it. |
 | `department` | `id`, `name` | |
 | `role` | `id`, `department_id`, `family`, `level` (1–5), `title` | e.g. Software Engineer, L3. |
-| `role_default_component` | `role_id`, `type`, `basis`, `value`, `frequency` | Template copied onto new hires (E3, E4). |
+| `role_default_component` | `role_id`, `type` (bonus or commission), `percent`, `label` | Template copied onto new hires (E3, E4). A percentage of base, because a role spans every currency. |
 | `pay_band` | `role_id`, `country_code`, `min/mid/max_minor` | Unique per (role, country). |
-| `employee` | `id`, `employee_code` (unique), `name`, `email` (unique), `country_code`, `role_id`, `employment_type`, `fte`, `status`, `hire_date`, `termination_date` | |
-| `compensation_version` | `id`, `employee_id`, `effective_from`, `effective_to` (nullable), `reason`, `currency`, `base_annual_minor`, **derived (local currency only):** `fixed_cash_minor`, `target_variable_minor`, `ttc_minor` | Immutable once written. |
+| `employee` | `id`, `employee_code` (unique), `name`, `email` (unique), `employment_type`, `fte`, `status`, `hire_date`, `termination_date` | No role or country: those belong to the version in force (see below). |
+| `compensation_version` | `id`, `employee_id`, `effective_from`, `effective_to` (nullable), `reason`, `role_id`, `country_code`, `currency`, `base_annual_minor`, **derived (local currency only):** `fixed_cash_minor`, `target_variable_minor`, `ttc_minor`, `note`, `created_at` | Immutable once written, except `effective_to`, set when a later version supersedes it. |
 | `compensation_component` | `version_id`, `type`, `basis`, `value`, `frequency`, `payout_date` | |
 
 ### Design decisions
@@ -105,9 +105,11 @@ erDiagram
   Both are indexed joins over ~10k current versions, well within the latency budget. The calculation logic still lives in the domain layer; repositories supply the inputs.
 - **Money is stored as integers** (`*_minor` = cents/paise), with the currency on the row. A `Money` value object in the domain prevents adding different currencies.
 - **"Current" version** = `effective_from <= as_of AND (effective_to IS NULL OR effective_to > as_of)`.
+- **Role and country live on the version, not the employee.** An employee's role, country, band and currency are those of the version in force on `as_of` (or, before their start date, of their first version). A promotion or transfer dated 1 Jan 2027 therefore applies on that day with no scheduled job, the same read-time rule as USD and compa-ratio. An employee with no version at all (E13) has no role or country until a package is recorded.
+- **Decimals are stored exactly.** FX rates, FTE and percentages use an `ExactDecimal` column type: `NUMERIC` on Postgres, text on SQLite (which would otherwise round them through floating point).
 
 ### Indexes
-`employee(country_code)`, `employee(role_id)`, `employee(status)`, `employee(name)`, unique `employee(employee_code)`, unique `employee(email)`, `compensation_version(employee_id, effective_from)`, unique `pay_band(role_id, country_code)`.
+`employee(status)`, `employee(name)`, `employee(employment_type)`, unique `employee(employee_code)`, unique `employee(email)`, `compensation_version(employee_id, effective_from)`, `compensation_version(role_id)`, `compensation_version(country_code)`, partial unique `compensation_version(employee_id) WHERE effective_to IS NULL` (one open version per employee), unique `pay_band(role_id, country_code)`, `fx_rate(is_active, currency)`.
 
 ## 5. API design
 
@@ -119,7 +121,7 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 | `GET /employees/{id}` | Profile + current package + band comparison. |
 | `POST /employees` | Hire: creates the employee + first version (role defaults applied, overridable). |
 | `PATCH /employees/{id}` | Update non-compensation details. |
-| `POST /employees/{id}/terminate` | Ends employment: sets status + termination date, and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
+| `POST /employees/{id}/terminate` | Ends employment: records the last day worked (which may be in the future; status is derived from it at read time) and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
 | `GET /employees/{id}/compensation` | Full version history. |
 | `POST /employees/{id}/compensation` | New version (raise, promotion, correction) with `effective_from` + `reason`. |
 | `GET /employees/export.csv` | CSV of the current filtered list (S4). |

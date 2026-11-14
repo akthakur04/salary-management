@@ -63,7 +63,7 @@ Rounding: calculate in minor units and round half-to-even once, at the end. Comp
 |---|---|---|
 | E9 | Part-time (e.g. 60% FTE) | Pay stored as actually paid; band comparison uses FTE-equivalent. |
 | E10 | Contractor | Has compensation but **no pay band** (compa-ratio "n/a"); excluded from band analytics, included in cost. |
-| E11 | Terminated employee | Kept for history; excluded from headcount and current cost by default; filterable. |
+| E11 | Terminated employee | Kept for history; excluded from headcount and current cost by default; filterable. The termination date is the **last day worked** and may be in the future: the employee counts as terminated from the day after, worked out at read time. Pay changes dated after the last day are rejected. |
 | E12 | On leave | Counted in headcount and cost (still employed). |
 | E13 | Employee with no compensation record | Shown in the Exceptions view; excluded from averages rather than counted as 0. |
 
@@ -112,7 +112,7 @@ Every edge case has at least one named test. Domain tests are in [`backend/tests
 | E8 | Sales commission | `test_package.py::test_sales_commission_counts_as_target_variable`, `test_package.py::test_fixed_and_variable_mix_shows_commission_as_variable` |
 | E9 | Part-time | `test_bands.py::test_part_time_employee_is_compared_to_band_at_fte`, `test_bands.py::test_part_time_pay_that_looks_low_is_in_band_at_fte` |
 | E10 | Contractor | `test_bands.py::test_contractor_has_no_band_and_no_compa_ratio`, `test_stats.py::test_contractors_are_excluded_from_band_distribution` |
-| E11 | Terminated | `test_employment.py::test_terminated_employee_is_excluded_from_headcount_and_current_cost` |
+| E11 | Terminated | `test_employment.py::test_terminated_employee_is_excluded_from_headcount_and_current_cost`, `test_employment.py::test_employee_is_terminated_from_the_day_after_their_last_day` |
 | E12 | On leave | `test_employment.py::test_employee_on_leave_is_counted_in_headcount_and_cost` |
 | E13 | No compensation record | `test_stats.py::test_employee_without_a_package_is_excluded_from_averages_not_counted_as_zero` |
 | E14 | Future-dated raise | `test_versions.py::test_future_dated_raise_leaves_current_package_unchanged_until_its_date`, `test_versions.py::test_future_dated_raise_is_listed_as_pending`, `test_versions.py::test_only_changes_within_the_window_are_due_soon` |

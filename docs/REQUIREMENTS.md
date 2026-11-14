@@ -72,7 +72,7 @@ C1 Bulk CSV import with row-level validation report · C2 Annual merit-cycle pla
 
 ## 6. Non-Functional Requirements
 
-- **Performance:** list and insight endpoints < 300 ms at 10k employees and ~30k compensation versions (indexed filters, SQL aggregates, a precomputed "current package" view).
+- **Performance:** list and insight endpoints < 300 ms at 10k employees and ~30k compensation versions (indexed filters, SQL aggregates, and package totals precomputed on each version so "current package" queries never unpack components).
 - **Correctness:** domain rules (no overlapping effective periods, positive amounts, valid currency) are enforced in a tested domain layer, not only in the UI.
 - **Quality:** fast, deterministic unit tests around calculations and rules; incremental, test-first commits.
 - **Usability:** a non-technical HR Manager can use it without training, with clear empty, loading, error, and confirmation states.

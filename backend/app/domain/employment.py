@@ -1,5 +1,6 @@
 """Employment type, FTE and status rules."""
 
+from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 
@@ -34,6 +35,19 @@ def validate_fte(employment_type: EmploymentType, fte: Decimal) -> None:
             employment_type=employment_type,
             fte=str(fte),
         )
+
+
+def status_on(
+    status: EmploymentStatus, termination_date: date | None, as_of: date
+) -> EmploymentStatus:
+    """Employment status on a date. The termination date is the last day worked.
+
+    Terminating someone records the date; they stay active (or on leave) until
+    that day and count as terminated from the day after, worked out at read time.
+    """
+    if termination_date is not None and as_of > termination_date:
+        return EmploymentStatus.TERMINATED
+    return status
 
 
 def is_current_employee(status: EmploymentStatus) -> bool:

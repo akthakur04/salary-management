@@ -103,3 +103,59 @@ These follow from the docs or from the kick-off answers, but the docs didn't spe
 - Every edge case E1–E25 maps to at least one test. A script checked that all 44 test names in the traceability table exist.
 - Ravi Kumar's numbers from the profile design reproduce exactly: fixed cash ₹27,86,400, total pay ₹30,26,400, compa-ratio 0.89, and USD 36,316.80 at 0.012.
 - ruff, the format check and mypy (strict) pass.
+
+## Phase 3: Persistence
+
+- **Prompt:** "start phase 3 and raise a separate PR".
+- **Output:**
+  - ORM models and constraints
+  - an exact-decimal column type
+  - the first Alembic migration, with a test that the migrated schema matches the models
+  - repositories for reference data, compensation history and the employee directory
+  - hire, revise and terminate services, each in one transaction
+  - a directory service that adds the domain's band comparison and USD figures
+- **Test-first:** repositories, services and the directory were each committed as failing `test:` commits before the `feat:` commits.
+
+### Decisions the candidate made at the start of the phase
+
+The AI raised two questions before writing any code:
+
+| Question | Candidate's decision |
+|---|---|
+| Should the employee row keep its own role and country, now that each version stores them? Keeping them would leave a future-dated promotion stale until something updated them. | **Read them from the version in force.** The columns were dropped from `employee`, and the directory joins the version in force on `as_of`. |
+| What should happen when an employee with a saved future change is terminated before that change takes effect? | **Reject with `409 PENDING_CHANGE_AFTER_TERMINATION`.** Revising a terminated employee is rejected too. |
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| FX rates, FTE and percentages use an `ExactDecimal` type: NUMERIC on Postgres, text on SQLite | SQLite would round them through floating point. The migration test confirms the schema still matches the models. |
+| A revision without components carries over the recurring components only | A one-time payment belongs to the version it was recorded in; copying it forward would count it twice in its payout year. |
+| Carried-over fixed amounts keep their original currency | A transfer must restate allowances in the new currency. Otherwise ₹30,000 would silently become €30,000. |
+| Before their start date, a future hire shows the role and country of their first version, with no current package | They still appear in the directory with the right role and country. |
+| ~~Termination dates must fall between the hire date and today~~ | Replaced on review (see below). |
+| Directory band filter in SQL, display values from the domain | SQL is needed to filter and count. A parametrised test checks the SQL position matches the domain comparison for every position. |
+
+### Candidate's decision on review: future termination dates
+
+The AI pointed out that three rules together made some employees impossible to terminate: "reject a termination with a pending change after it", "no future termination dates" and "versions can't be withdrawn". Anyone with a pending raise could only be terminated after the raise took effect. The candidate chose to **allow future termination dates**:
+
+- Terminating records the last day worked and nothing else.
+- Status is worked out from that date at read time (`status_on` in the domain, and the same rule in the directory query). The employee counts as terminated from the day after, with no job needed to flip the status.
+- HR can date a termination on or after a pending change.
+- A pay change dated after the last day is rejected with `CHANGE_AFTER_TERMINATION`.
+- `EmployeeService` no longer needed its clock, so the AI removed that dependency.
+
+### Corrections during the phase
+
+- **Migration types:** Alembic rendered the custom decimal type as `app.models.types.ExactDecimal()`, with no import and no precision. The AI fixed it by hand and confirmed the schema comparison can detect drift by adding a column in memory.
+- **Wrong test expectations:** the AI's first directory test had two wrong expected values. Every employee code started with `EMP-0`, so that filter matched everyone, and Ravi has no bonus at that point. Both were caught by checking the expected numbers by hand before implementing.
+- **A test-only method:** the AI first planned a repository method used only by a test, then dropped it and had the test read the stored columns directly.
+- **A misleading message:** the first termination error suggested "contact support to withdraw the change", which isn't a feature. The message was rewritten.
+
+### How the output was verified
+
+- 244 backend tests pass in about 2 s.
+- Coverage is 99% overall, with the revise service and the directory at 100%. The one uncovered line is the Postgres branch of the decimal type, which can't run on SQLite.
+- Migrations upgrade to a schema identical to the models and downgrade to an empty database.
+- ruff, the format check, mypy (strict, now including the migrations) and all pre-commit hooks pass.
