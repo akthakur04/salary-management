@@ -179,3 +179,31 @@ export function useHire() {
     },
   });
 }
+
+export function useUpdateEmployee(employeeId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.patch<EmployeeProfile>(`/employees/${employeeId}`, body),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(keys.employee(employeeId), profile);
+      void queryClient.invalidateQueries({ queryKey: keys.employees });
+      void queryClient.invalidateQueries({ queryKey: keys.insights });
+    },
+  });
+}
+
+export function useTerminate(employeeId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (terminationDate: string) =>
+      api.post<EmployeeProfile>(`/employees/${employeeId}/terminate`, {
+        termination_date: terminationDate,
+      }),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(keys.employee(employeeId), profile);
+      void queryClient.invalidateQueries({ queryKey: keys.employees });
+      void queryClient.invalidateQueries({ queryKey: keys.insights });
+    },
+  });
+}
