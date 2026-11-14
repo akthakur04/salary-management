@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, FastAPI
 
-from app.api import auth, health
+from app.api import auth, health, reference
 from app.api.deps import require_session
 from app.api.errors import register_error_handlers
 from app.core.clock import Clock, SystemClock
@@ -31,6 +31,7 @@ def create_app(settings: Settings | None = None, clock: Clock | None = None) -> 
 
     protected = APIRouter(dependencies=[Depends(require_session)])
     protected.include_router(auth.router)
+    protected.include_router(reference.router)
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(public)
