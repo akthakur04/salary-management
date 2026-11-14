@@ -58,3 +58,48 @@ Before writing code, the AI read all the docs and screen sources and raised nine
 - `ruff check .`, `ruff format --check .` and `mypy` (strict) all pass.
 - `pytest`: 13 tests pass in under 0.1 s.
 - The real server was started with `uvicorn app.main:create_app --factory`. `/api/v1/health` returned `{"status":"ok","database":"ok"}`, an unknown route returned the standard error shape, and `/docs` loaded.
+
+## Phase 2: Domain, test-first
+
+- **Prompt:** "go, do and raise a separate PR for it", for Phase 2 of the master prompt.
+- **Output:** the pure-Python domain in `backend/app/domain/`:
+  - `Money` and the domain errors
+  - pay components
+  - package totals
+  - role defaults
+  - employment rules and pay-band comparison
+  - FX conversion
+  - effective-dated version rules
+  - pay summaries and band distribution
+  - employee identity
+  - a test that keeps the domain free of framework imports
+  - a traceability table in `COMPENSATION_MODEL.md` §5
+- **Test-first:** each module was committed as a failing `test:` commit, then a `feat:` commit that makes it pass.
+
+### Decisions the AI made, for review
+
+These follow from the docs or from the kick-off answers, but the docs didn't spell them out:
+
+| Decision | Reasoning |
+|---|---|
+| Role defaults are bonus or commission **percentages** only | A role spans every country and currency, so a fixed default amount (₹ vs $) would be meaningless. Allowances are set per employee. |
+| A 0% bonus or commission is rejected | E20 rejects zero components. HR removes the component instead. |
+| The first version must be a `hire`, and `hire` is only allowed first | Keeps history meaningful, and matches the seed and the hire service. |
+| A new change must start after the latest version, even when that version is future-dated | This follows from Q5 and E16. Allowing it would create an overlap with the pending change. |
+| A same-date correction supersedes the latest version, which stays in history with a zero-length period | Q5 allowed a correction "on" the latest start date. The zero-length period keeps the record while it never counts as in force. |
+| Compa-ratio is rounded to two decimals; raise % and variable share to one | Matches the design (0.89, +9.1%). |
+| USD always has rate 1 | USD per USD is 1 by definition, so the rate set doesn't need it. |
+
+**Candidate's decision on review:** the AI asked whether moves to another country (E18) should get their own reason, rather than borrowing `market_adjustment`. The candidate chose to **add `transfer`**, so the reasons are hire, promotion, merit, market adjustment, transfer and correction.
+
+### Corrections during the phase
+
+- **Ruff import order:** the pre-commit ruff hook, run from the repo root, sorted `app` imports as third-party, the opposite of ruff run from `backend/`. The fix pins `app` and `tests` as first-party. The hook also caught two compound `assert`s and a `zip` that should be `pairwise`.
+- **Traceability checker:** the AI's first script reported every test as missing. It had added `-q` on top of the configured `-q`, so pytest printed per-file counts instead of test IDs. The AI fixed the script before trusting the result.
+
+### How the output was verified
+
+- Domain suite: 154 tests in 0.20 s, with **100% line and branch coverage** of `app/domain`. CI now fails if domain coverage drops below 100%.
+- Every edge case E1–E25 maps to at least one test. A script checked that all 44 test names in the traceability table exist.
+- Ravi Kumar's numbers from the profile design reproduce exactly: fixed cash ₹27,86,400, total pay ₹30,26,400, compa-ratio 0.89, and USD 36,316.80 at 0.012.
+- ruff, the format check and mypy (strict) pass.
