@@ -4,10 +4,15 @@ Salary management for an HR Manager looking after 10,000 employees across 8 coun
 
 > **Status:** in progress. The backend foundation, the domain layer (all salary rules, edge cases E1–E25), persistence (schema, migrations, hire / revise / terminate, the employee directory query), the 10,000-employee demo seed, the REST API with the HR login, and the Next.js frontend (all seven screens plus hiring) are in place; deployment follows.
 
+## Getting started
+
+New here? Follow the **[setup guide](docs/SETUP_GUIDE.md)**: from a fresh clone to signing in with 10,000 demo employees, covering migrations, seed data, the HR login, both servers, and troubleshooting.
+
 ## Docs
 
 | Doc | What it covers |
 |---|---|
+| [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | Run it locally, step by step, with troubleshooting |
 | [REQUIREMENTS.md](docs/REQUIREMENTS.md) | Goal, prioritised scope (MoSCoW), what's out of scope and why |
 | [COMPENSATION_MODEL.md](docs/COMPENSATION_MODEL.md) | Domain model, calculation rules, edge cases E1–E25 |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, layering, data model, API, auth, performance, testing, trade-offs |
