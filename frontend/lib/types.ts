@@ -222,3 +222,13 @@ export type PayBandListing = BandRange & { role_id: number; country_code: string
 export type ApiErrorBody = {
   error: { code: string; message: string; details: Record<string, unknown> };
 };
+
+export type ComponentInput = {
+  type: ComponentType;
+  basis: ComponentBasis;
+  frequency: Frequency;
+  label: string;
+  amount_minor?: number;
+  percent?: string;
+  payout_date?: string;
+};

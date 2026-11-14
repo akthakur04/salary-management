@@ -6,6 +6,7 @@ import { api } from "./api";
 import { toApiParams, type Filters } from "./filters";
 import type {
   BandGroup,
+  ComponentInput,
   Country,
   Department,
   EmployeeProfile,
@@ -143,7 +144,7 @@ export type RevisionBody = {
   reason: string;
   base_annual_minor: number;
   role_id?: number;
-  components?: unknown[];
+  components?: ComponentInput[];
   note?: string;
 };
 
