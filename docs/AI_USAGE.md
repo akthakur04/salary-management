@@ -159,3 +159,48 @@ The AI pointed out that three rules together made some employees impossible to t
 - Coverage is 99% overall, with the revise service and the directory at 100%. The one uncovered line is the Postgres branch of the decimal type, which can't run on SQLite.
 - Migrations upgrade to a schema identical to the models and downgrade to an empty database.
 - ruff, the format check, mypy (strict, now including the migrations) and all pre-commit hooks pass.
+
+## Phase 4: Seed
+
+- **Prompt:** "Start Phase 4". It was the first phase branched from `dev` after PR #5 merged, so its PR targets `dev`.
+- **Output:**
+  - reference data: 8 countries, 8 departments, 25 families × 5 levels, a band for every role in every country, and role defaults
+  - a deterministic generator for 10,000 employees with salary histories
+  - regional synthetic names
+  - an idempotent bulk loader
+  - the `python -m app.seed` command
+- **Test-first:** the generator's invariants (on a 2,000-person sample) and the loader's behaviour were each committed as failing tests before the implementation.
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| Place current pay against the band first, then build history backwards | It's the only way to control the "~85% in band" mix while keeping realistic merits and promotions. Every version still goes through `plan_revision`, so the seed can't create data the app would reject. |
+| Pin the SE L3 and SE L4 India bands, and seed Ravi Kumar exactly as designed | The demo scenario (a 12% promotion raise that still lands below the L4 minimum) depends on those exact figures. |
+| The United Kingdom uses ISO code `GB` | It's the ISO 3166 code. The brief and master prompt say "UK", and it displays as "United Kingdom". |
+| Missing packages (12) and future hires (20) at fixed positions, not random draws | Every sample size then gets a predictable number, so tests don't depend on luck. |
+| Loader ids come back via `RETURNING`, never written explicitly | Explicit ids would leave Postgres sequences behind, and the app's next insert would collide with seeded rows. |
+| A database that already has data is left alone unless `--reset` is given | Re-running the seed against the deployed demo shouldn't wipe changes made during the demo. |
+
+### Corrections during the phase
+
+- **A zero sign-on bonus at full scale:** the full 10,000-person run failed, though the 2,000-person sample passed. A 5% sign-on rounded to the nearest thousand came to 0 for small part-time bases in GBP or SGD, and the domain correctly rejected it. The fix rounds to the nearest hundred, and a test now generates the full set.
+- **Too few versions:** the first full run produced 21,486 versions against the ~30k the requirements plan for. The AI weighted histories towards three or four versions; recent hires cap it at ~26,800.
+- **Slow loading (13.6 s):** the load fit the 15 s budget, but only just. Profiling showed SQLAlchemy's ORM bulk insert with `RETURNING` issuing one statement per row (32k statements), while SQLite itself took 0.75 s. Batched Core inserts brought it to 1.5 s.
+- **Name lists:** reformatting them into comma-separated strings first split two-word names ("Wei Ling") and left empty entries. A check on the list lengths caught it before commit.
+
+### How the output was verified
+
+- 271 backend tests pass in about 4 s. Coverage is 99% overall; the generator, names and reference data are at 100%.
+- The generator tests check, on a 2,000-person sample:
+  - the same seed gives the same output
+  - unique codes and emails
+  - 8 departments, 125 roles and 1,000 bands
+  - a valid history of 1–4 versions for each person, in the right currency
+  - the employment mix, about 5% terminated with nothing due after the last day, and about 85% in band
+  - about 20% overrides, plus pending changes and missing packages
+  - Ravi's exact figures
+
+  A separate test generates the full 10,000.
+- The loader tests check that the data loads completely, that a second run changes nothing, that `--reset` reloads identical data, that the first 50 histories read back exactly as generated, and that the directory shows Ravi at compa-ratio 0.89 and $36,316.80.
+- The real command was run against a migrated SQLite file several times: 10,000 employees, 26,776 versions and 32,249 components in about 1.5 s per load.

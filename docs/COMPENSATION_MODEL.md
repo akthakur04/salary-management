@@ -89,12 +89,23 @@ Rounding: calculate in minor units and round half-to-even once, at the end. Comp
 
 ## 4. Seed data shape
 
-The seed script (fixed random seed) produces:
-- 10,000 employees across ~8 countries (US, UK, DE, IN, SG, BR, CA, AU), ~8 departments, ~25 roles × 5 levels.
-- Pay bands per role level and country; ~85% of employees in band, the rest deliberately below or above.
-- Role-based default structures, with ~20% of employees carrying overrides (E3).
-- 1–4 compensation versions per employee (hire, merits, promotions), some future-dated (E14).
-- A mix of employment types (~85% full-time, ~8% part-time, ~7% contractor) and statuses (~5% terminated).
+The seed (`python -m app.seed`, code in [`backend/app/seed/`](../backend/app/seed/)) is deterministic: a fixed random seed and fixed dates ("today" is 12 Nov 2026) give an identical data set on every run. The figures below are from the full run.
+
+| What | Shape |
+|---|---|
+| Employees | **10,000**, with codes `EMP-00001`–`EMP-10000` and synthetic regional names. Emails are `first.last@acme.example`, made unique. |
+| Countries | 8: US, IN, GB (United Kingdom), BR, DE, CA, AU, SG, weighted by headcount (India and the US largest). One currency each, with fixed reference FX rates in a single active rate set (E25 is checked before loading). |
+| Job architecture | 8 departments and 25 job families × 5 levels = **125 roles**. |
+| Pay bands | 1,000 (every role in every country): the family's US L3 midpoint, × a level multiplier (0.6–1.55), × a country pay factor, converted to local currency, with min/max at ±18%. SE L3 and SE L4 in India are pinned to the design's figures for the demo scenario. |
+| Band position | ~85% of banded employees in band; the rest just below (min × 0.85–0.98) or above (max × 1.02–1.12). Current pay is placed first, then history is built backwards. |
+| Role defaults | Sales families get commission at every level (30–50%); other families get a bonus from L3 (10%, 15%, 20%). ~20% of employees override a default (raised, lowered, removed, or a bonus added) (E3). |
+| Allowances | India: housing (15% of base, monthly) and meal; Brazil: meal; Singapore: transport. Sign-on bonuses on ~10% of hires (one-time, excluded from total pay). |
+| Histories | 1–4 versions each (~26,800 in total): hire, then April merits, market adjustments and promotions. ~4% have a future-dated change (E14). Every version is built with the domain's `plan_revision`. |
+| Employment mix | ~85% full-time, ~8% part-time (FTE 0.5–0.8), ~7% contractors (no variable pay, no band); ~5% terminated with a past last day, ~2% on leave. |
+| Edge cases on purpose | 12 employees with no compensation record (E13), and 20 hires starting after "today" (a pending hire version, no current package). |
+| Showcase | **Ravi Kumar** (`EMP-04821`, Software Engineer L3, India), exactly as on the profile design: hired 14 Mar 2022 at L2, merit 2023, promotion 2024, merit 2025; base ₹24,00,000, total pay ₹30,26,400, compa-ratio 0.89. |
+
+Loading is idempotent: a database that already has data is left alone unless `--reset` is given, which clears and reloads in one transaction. On SQLite the full set loads in about 1.5 s.
 
 ## 5. Edge-case traceability
 

@@ -2,7 +2,7 @@
 
 Salary management for an HR Manager looking after 10,000 employees across 8 countries: full salary packages (base, allowances, bonus, commission, one-time payments), effective-dated history, pay bands, and insights into how the organisation pays people.
 
-> **Status:** in progress. The backend foundation, the domain layer (all salary rules, edge cases E1–E25) and persistence (schema, migrations, hire / revise / terminate, the employee directory query) are in place; seed, API and frontend follow phase by phase.
+> **Status:** in progress. The backend foundation, the domain layer (all salary rules, edge cases E1–E25), persistence (schema, migrations, hire / revise / terminate, the employee directory query) and the 10,000-employee demo seed are in place; the API and frontend follow phase by phase.
 
 ## Docs
 
@@ -30,6 +30,7 @@ pip install -e ".[dev]"
 cp .env.example .env
 (cd .. && pre-commit install)   # git hooks, see CONTRIBUTING.md
 alembic upgrade head            # create or update the database schema
+python -m app.seed               # load 10,000 demo employees (once; --reset reloads)
 uvicorn app.main:create_app --factory --reload
 ```
 

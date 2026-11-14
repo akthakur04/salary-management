@@ -175,7 +175,7 @@ Tests cover the happy path, wrong password, missing or expired or tampered cooki
 | Insight aggregates | One SQL query per widget: current versions joined to the active `fx_rate` (and `pay_band` for band widgets), then `GROUP BY`. Stored local totals mean no component unpacking. |
 | Median / percentiles | SQLite has no `percentile_cont`. To stay portable, the repository fetches the sorted USD-converted TTC for the filtered group (≤ 10k numbers, ~80 KB) and the domain computes percentiles. This is fast, exact, and the same on both databases. |
 | N+1 queries | Explicit `selectinload` for components; list endpoints use a single joined query. |
-| Seeding | Bulk inserts in batches inside one transaction; target < 15 s for 10k employees + ~30k versions. |
+| Seeding | Generated in pure Python (every version through the domain's `plan_revision`), then batched Core inserts inside one transaction, with ids read back via `RETURNING` so Postgres sequences stay in step. Target < 15 s; measured ~1.5 s on SQLite for 10k employees + ~26.8k versions. (The ORM bulk path issued one statement per row and took 13.6 s.) |
 | Frontend | TanStack Query caching, debounced search (300 ms), `placeholderData: keepPreviousData` to avoid table flicker while paging. |
 
 **Budget:** p95 < 300 ms for list and insight endpoints on seeded data. Verified with a small timing script during development; numbers recorded in `docs/PERFORMANCE.md`.
