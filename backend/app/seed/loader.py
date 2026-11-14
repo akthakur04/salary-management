@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.domain.fx import FxRates
@@ -83,22 +83,31 @@ def _count(session: Session, model: type[Any]) -> int:
     return session.scalar(select(func.count()).select_from(model)) or 0
 
 
+def _insert_rows(session: Session, model: type[Any], rows: Sequence[dict[str, Any]]) -> None:
+    """Batched Core insert: the ORM's bulk path would issue one statement per row."""
+    if rows:
+        session.connection().execute(model.__table__.insert(), rows)
+
+
 def _insert_returning_ids(
     session: Session, model: type[Any], rows: Sequence[dict[str, Any]]
 ) -> list[int]:
     if not rows:
         return []
-    statement = insert(model).returning(model.id, sort_by_parameter_order=True)
-    return list(session.scalars(statement, rows))
+    table = model.__table__
+    statement = table.insert().returning(table.c.id, sort_by_parameter_order=True)
+    return list(session.connection().execute(statement, rows).scalars())
 
 
 def _insert(session: Session, data: SeedData) -> int:
-    session.execute(
-        insert(Country),
+    _insert_rows(
+        session,
+        Country,
         [{"code": c.code, "name": c.name, "currency": c.currency} for c in COUNTRIES],
     )
-    session.execute(
-        insert(FxRate),
+    _insert_rows(
+        session,
+        FxRate,
         [
             {
                 "rate_set": RATE_SET,
@@ -138,8 +147,9 @@ def _insert(session: Session, data: SeedData) -> int:
             strict=True,
         )
     )
-    session.execute(
-        insert(RoleDefaultComponent),
+    _insert_rows(
+        session,
+        RoleDefaultComponent,
         [
             {
                 "role_id": role_ids[role_id],
@@ -150,8 +160,9 @@ def _insert(session: Session, data: SeedData) -> int:
             for role_id, default in data.role_defaults
         ],
     )
-    session.execute(
-        insert(PayBand),
+    _insert_rows(
+        session,
+        PayBand,
         [
             {
                 "role_id": role_ids[b.role_id],
@@ -201,5 +212,5 @@ def _insert(session: Session, data: SeedData) -> int:
         for component in version.package.components
     ]
     if component_rows:
-        session.execute(insert(CompensationComponent), component_rows)
+        _insert_rows(session, CompensationComponent, component_rows)
     return len(versions)
