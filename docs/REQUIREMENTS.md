@@ -34,7 +34,7 @@ Web-based **salary management** software where the HR Manager can **manage salar
 | M3 | **Employee profile:** personal and job details, employment type (full-time / part-time with FTE % / contractor), status (active / on leave / terminated). |
 | M4 | **Compensation package per employee:** annual base salary plus any number of **components**: recurring allowances, target annual bonus (% of base or fixed amount), sales commission (target variable), one-time payments (sign-on, retention). Each employee can have a different mix. |
 | M5 | **Role default structures:** each role defines its default components (e.g. Sales → commission; Engineering L4+ → 15% bonus). New hires get the defaults; HR can **override or remove them per employee**. |
-| M6 | **Effective-dated history:** every compensation change creates a new version with an **effective date** and a **reason** (hire, promotion, merit, market adjustment, correction). History is never overwritten. Future-dated changes are supported. |
+| M6 | **Effective-dated history:** every compensation change creates a new version with an **effective date** and a **reason** (hire, promotion, merit, market adjustment, transfer, correction). History is never overwritten. Future-dated changes are supported. |
 | M7 | **Total compensation calculation:** annual base, fixed cash, target variable, and total target compensation, in local currency **and** USD (fixed reference FX rates). |
 | M8 | **Seed script:** 10,000 deterministic employees with realistic structures, histories, and edge cases. |
 | M9 | **Simple login:** one HR Manager account whose credentials are set by environment variables. All pages and API routes require a valid session; logout ends it. Salary data is sensitive, so even a demo deployment shouldn't be open to anyone with the URL. |
@@ -72,7 +72,7 @@ C1 Bulk CSV import with row-level validation report · C2 Annual merit-cycle pla
 
 ## 6. Non-Functional Requirements
 
-- **Performance:** list and insight endpoints < 300 ms at 10k employees and ~30k compensation versions (indexed filters, SQL aggregates, a precomputed "current package" view).
+- **Performance:** list and insight endpoints < 300 ms at 10k employees and ~30k compensation versions (indexed filters, SQL aggregates, and package totals precomputed on each version so "current package" queries never unpack components).
 - **Correctness:** domain rules (no overlapping effective periods, positive amounts, valid currency) are enforced in a tested domain layer, not only in the UI.
 - **Quality:** fast, deterministic unit tests around calculations and rules; incremental, test-first commits.
 - **Usability:** a non-technical HR Manager can use it without training, with clear empty, loading, error, and confirmation states.

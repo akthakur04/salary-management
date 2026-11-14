@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "sqlalchemy>=2.0.36,<2.2",
+    "alembic>=1.14,<2",
 ]
 
 [project.optional-dependencies]
@@ -47,10 +48,15 @@ select = [
     "RUF", # ruff-specific
 ]
 
+[tool.ruff.lint.isort]
+# Explicit, so import order is the same whether ruff runs from backend/ or
+# from the repository root (as the pre-commit hook does).
+known-first-party = ["app", "tests"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["app", "tests"]
+files = ["app", "tests", "migrations"]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
