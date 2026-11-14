@@ -276,6 +276,7 @@ These were caught by running the app in the preview browser rather than trusting
 - **Unnamed controls:** the promotion checkbox and the header search button had no accessible names.
 - **Future hires:** a future hire's profile offered "Record a package", even though their first package was already saved as pending.
 - **Mixed build output:** running `next build` beside the dev server corrupted the dev server's `.next` output, and the build was rerun cleanly. CI builds in its own checkout.
+- **Reported by the candidate after the PR:** autofilling the login crashed the page with "Cannot read properties of undefined (reading 'toLowerCase')". Browser autofill and password managers send `keydown` events with no `key`, and the ⌘K listener assumed one. A regression test reproduced it before the fix.
 
 Two generated-code issues were checked rather than assumed:
 
