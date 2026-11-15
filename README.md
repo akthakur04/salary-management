@@ -1,18 +1,102 @@
 # ACME Salary Management
 
-Salary management for an HR Manager looking after 10,000 employees across 8 countries: full salary packages (base, allowances, bonus, commission, one-time payments), effective-dated history, pay bands, and insights into how the organisation pays people.
+Salary management for an HR Manager looking after 10,000 employees across 8 countries. It covers full salary packages (base, allowances, bonus, commission and one-time payments), effective-dated history, pay bands, and insights into how the organisation pays people.
 
-> **Status:** in progress. The backend foundation, the domain layer (all salary rules, edge cases E1–E25), persistence (schema, migrations, hire / revise / terminate, the employee directory query), the 10,000-employee demo seed, the REST API with the HR login, and the Next.js frontend (all seven screens plus hiring) are in place; deployment follows.
+| | |
+|---|---|
+| **Live app** | _Not deployed yet. The URL goes here after the first deploy ([DEPLOYMENT.md](docs/DEPLOYMENT.md))._ |
+| **API health** | _Same: `https://<api>.onrender.com/api/v1/health`_ |
+| **Demo video** | _To be recorded from [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)_ |
 
-## Getting started
+## What it does
 
-New here? Follow the **[setup guide](docs/SETUP_GUIDE.md)**: from a fresh clone to signing in with 10,000 demo employees, covering migrations, seed data, the HR login, both servers, and troubleshooting.
+- **Directory** of 10,000 employees, with server-side search, filters, sorting and CSV export. Filters are kept in the URL.
+- **Profile** for each employee:
+  - their full package, annualised, in local currency and in USD
+  - the "how is this calculated?" breakdown
+  - a band gauge with compa-ratio
+  - effective-dated history
+- **Hire, revise and terminate:**
+  - Promotions apply the new role's default components.
+  - A live preview shows the new total and band position before anything is saved.
+  - Future-dated changes stay *pending* until their effective date.
+- **Exceptions** to work through: people below band, above band, missing a package, or with pending changes.
+- **Insights:**
+  - headcount, joiners and leavers, median and total pay
+  - pay by country, department or level
+  - fixed vs variable pay, position against bands, and a pay histogram
+  - drill-down to one country, department, level or type, in local currency
+
+## Architecture in brief
+
+```
+Browser ──▶ Next.js 15 (Vercel) ──/api/*──▶ FastAPI (Render, Docker) ──▶ Postgres (Render)
+```
+
+- **Backend:** Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 and Alembic. It's layered api → services → domain and repositories. All salary rules live in a pure, fully tested domain layer.
+- **Money:** stored as integer minor units with a currency. USD figures and band positions are computed at read time from versioned reference FX rates.
+- **Frontend:** Next.js App Router, TypeScript, shadcn/ui, TanStack Query and Table, React Hook Form + Zod, and Recharts. It's light theme only.
+- **One origin:** the browser only talks to Next.js, which proxies `/api/*` to FastAPI. So there's no CORS, and the session cookie (HttpOnly, signed) stays first-party.
+- **Databases:** SQLite in development and tests, Postgres in production. Only portable SQL is used.
+
+There's more in [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Run it locally
+
+Pick one way.
+
+**With Python and Node** (SQLite, hot reload): follow the **[setup guide](docs/SETUP_GUIDE.md)**. In short:
+
+```bash
+cd backend && python3.12 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+cp .env.example .env && python -m app.core.hash_password   # paste the printed values into .env
+alembic upgrade head && python -m app.seed
+uvicorn app.main:create_app --factory --reload             # API on :8000
+```
+
+```bash
+cd frontend && npm install && cp .env.example .env.local && npm run dev   # app on :3000
+```
+
+**With Docker** (Postgres, as in production): create `backend/.env` with the HR login as above, then run these from the repository root:
+
+```bash
+docker compose up --build
+```
+
+```bash
+docker compose run --rm api python -m app.seed
+```
+
+Then open http://localhost:3000 and sign in with `HR_ADMIN_EMAIL` and the password you hashed. The API docs are at http://localhost:8000/docs.
+
+## Tests and checks
+
+CI runs the same commands on every push and pull request. The git hooks run them locally (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
+```bash
+cd backend
+ruff check . && ruff format --check . && mypy && pytest
+```
+
+```bash
+cd frontend
+npm run lint && npm run typecheck && npm test && npm run build
+```
+
+To time the endpoints against the seeded data, run `python scripts/time_endpoints.py` from `backend/`. The results are in [PERFORMANCE.md](docs/PERFORMANCE.md): every list and insight endpoint is within the 300 ms p95 budget.
+
+## Deployment
+
+The API (Docker) and Postgres run on Render, from [render.yaml](render.yaml). The web app runs on Vercel. Migrations run when the API starts, and the demo data is loaded once with `python -m app.seed`. [DEPLOYMENT.md](docs/DEPLOYMENT.md) lists every value to set.
 
 ## Docs
 
 | Doc | What it covers |
 |---|---|
-| [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | Run it locally, step by step, with troubleshooting |
+| [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | Running it locally, step by step, with troubleshooting |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Render and Vercel setup, the values to set, seeding, Docker Compose |
+| [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | The demo walkthrough, including "promote Ravi Kumar to L4" |
 | [REQUIREMENTS.md](docs/REQUIREMENTS.md) | Goal, prioritised scope (MoSCoW), what's out of scope and why |
 | [COMPENSATION_MODEL.md](docs/COMPENSATION_MODEL.md) | Domain model, calculation rules, edge cases E1–E25 |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, layering, data model, API, auth, performance, testing, trade-offs |
@@ -20,68 +104,14 @@ New here? Follow the **[setup guide](docs/SETUP_GUIDE.md)**: from a fresh clone 
 | [UI_DESIGN.md](docs/UI_DESIGN.md) | Screens and design decisions; sources in [docs/design/](docs/design/) |
 | [PERFORMANCE.md](docs/PERFORMANCE.md) | Endpoint timings against the 300 ms budget, and what made them fast |
 | [AI_USAGE.md](docs/AI_USAGE.md) | How AI was used, and where its output was corrected |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Commit message rules (Conventional Commits), branches, PRs, git hooks and CI checks |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Commit message rules, branches, PRs, git hooks and CI checks |
 
-## Backend
+## Known limitations
 
-Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0. SQLite locally, Postgres in production.
-
-### Run locally
-
-```bash
-cd backend
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
-python -m app.core.hash_password  # paste the printed values into .env
-(cd .. && pre-commit install)   # git hooks, see CONTRIBUTING.md
-alembic upgrade head            # create or update the database schema
-python -m app.seed               # load 10,000 demo employees (once; --reset reloads)
-uvicorn app.main:create_app --factory --reload
-```
-
-The API is at http://localhost:8000/api/v1 (health check: `/api/v1/health`), with interactive docs at http://localhost:8000/docs.
-
-Every endpoint except login and health needs the session cookie that `POST /api/v1/auth/login` sets, with the email in `HR_ADMIN_EMAIL` and the password you hashed. The endpoints are listed in [ARCHITECTURE.md §5](docs/ARCHITECTURE.md#5-api-design).
-
-To time the list and insight endpoints against the seeded data, run `python scripts/time_endpoints.py`. The results are in [PERFORMANCE.md](docs/PERFORMANCE.md).
-
-### Checks
-
-Run from `backend/`; CI runs the same commands on every push and pull request.
-
-```bash
-ruff check .
-ruff format --check .
-mypy
-pytest
-```
-
-## Frontend
-
-Next.js 15 (App Router) with TypeScript, shadcn/ui (Radix + Tailwind), TanStack Query and Table, React Hook Form + Zod, and Recharts via shadcn charts. It's light theme only.
-
-### Run locally
-
-Start the backend first (see above), then:
-
-```bash
-cd frontend
-npm install
-cp .env.example .env.local   # API_ORIGIN points at the backend
-npm run dev
-```
-
-Open http://localhost:3000 and sign in with the `HR_ADMIN_EMAIL` and password you set for the backend. The browser only talks to Next.js, which proxies `/api/*` to FastAPI, so there's no CORS and the session cookie stays first-party.
-
-### Checks
-
-Run from `frontend/`; CI runs the same commands.
-
-```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
-```
+- **One login.** There's a single HR Manager account, set by environment variables. There's no user management, roles or approval workflow ([REQUIREMENTS §5](docs/REQUIREMENTS.md#5-deliberately-out-of-scope-and-why) explains why).
+- **No audit trail of who changed what.** Each change records its reason and effective date, but with one user there's no "changed by".
+- **Fixed reference FX rates.** USD figures use a versioned rate table, not live rates. That's deliberate, so the figures are reproducible.
+- **Company-wide insights are the slowest endpoints,** at roughly 240–290 ms p95 on SQLite. They aggregate in Python for identical results on SQLite and Postgres. Filtered views are under 100 ms. On local Postgres they are within 10–30 ms of SQLite; Render itself hasn't been measured.
+- **The free hosting plans sleep and expire.** The API sleeps after about 15 idle minutes (the first request then takes up to a minute), and the free Postgres database expires after 30 days.
+- **Not built:** payroll, tax, equity, benefits, pay-equity analytics, bulk CSV import and merit-cycle planning ([REQUIREMENTS §3–5](docs/REQUIREMENTS.md)).
+- **Synthetic data only.** The seed generates 10,000 fictional employees from a fixed random seed.

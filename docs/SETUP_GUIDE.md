@@ -24,7 +24,7 @@ The commands below are for macOS and Linux. On Windows, use WSL, or swap `source
 | Node.js | **22** (20 also works) | `node --version` |
 | npm | comes with Node | `npm --version` |
 
-You don't need Docker or a database server: local development uses a SQLite file, which Python ships with. Production uses Postgres (see [ARCHITECTURE.md §9](ARCHITECTURE.md#9-deployment)).
+You don't need Docker or a database server: local development uses a SQLite file, which Python ships with. Production uses Postgres (see [ARCHITECTURE.md §9](ARCHITECTURE.md#9-deployment)). If you'd rather run everything in Docker against Postgres, see [DEPLOYMENT.md → Run it with Docker](DEPLOYMENT.md#run-it-with-docker).
 
 ## 2. Clone the repository
 

@@ -230,9 +230,13 @@ Principles: **fast** (whole backend suite in seconds), **deterministic** (fixed 
 GitHub main ──▶ Render: API (Docker) ──▶ Render Postgres
            └──▶ Vercel: Next.js (rewrites /api/* → Render API via API_ORIGIN)
 ```
-- Alembic migrations run on API start-up; the seed runs once via a one-off command.
-- The browser never calls the API origin directly (same-origin via rewrites), so CORS stays closed.
-- Config through environment variables (`DATABASE_URL`, `API_ORIGIN`, `HR_ADMIN_EMAIL`, `HR_ADMIN_PASSWORD_HASH`, `SESSION_SECRET`); `.env.example` committed with placeholders only, and real values live in the hosting provider's secret store.
+- The API ships as a Docker image (`backend/Dockerfile`, Python 3.12 slim, non-root). Its start script runs `alembic upgrade head`, then uvicorn on `$PORT`. Render builds it from the `render.yaml` Blueprint, which also creates the Postgres database and wires its connection string into `DATABASE_URL`.
+- Postgres connects through psycopg 3. Hosted `postgres://` and `postgresql://` URLs are rewritten to `postgresql+psycopg://` in the settings, so the provider's string works as given.
+- The seed runs once, as a one-off `python -m app.seed`. On Render's free plan, which has no shell, it's run from a laptop against the database's external URL.
+- The browser never calls the API origin directly (same-origin via rewrites), so CORS stays closed. `API_ORIGIN` is fixed into the rewrite when Next.js builds, so changing it means redeploying the web app.
+- Config through environment variables (`DATABASE_URL`, `API_ORIGIN`, `HR_ADMIN_EMAIL`, `HR_ADMIN_PASSWORD_HASH`, `SESSION_SECRET`); `.env.example` committed with placeholders only, and real values live in the hosting provider's secret store. Render generates `SESSION_SECRET`.
+- `docker-compose.yml` runs the same API image with Postgres and the web app locally, for checking against Postgres before a deploy.
+- Step-by-step setup, the values to set, and the free-plan limits are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## 10. Key trade-offs
 

@@ -15,7 +15,7 @@ python scripts/time_endpoints.py --runs 30
 
 - **Data:** the full seed (10,000 employees, 26,776 compensation versions, 32,249 components), as of 12 Nov 2026.
 - **What's timed:** requests go through the whole app in-process (routing, the session check, validation, the database, the domain calculations and serialisation), but not over a network. The numbers are server time. Each endpoint gets 3 warm-up requests, then 30 timed ones.
-- **Environment:** SQLite 3.49 on an Apple M4 laptop, Python 3.12, measured 15 Nov 2026. Postgres on Render will differ. These results show the design meets the budget at this scale; they aren't a production benchmark.
+- **Environment:** SQLite 3.49 on an Apple M4 laptop, Python 3.12, measured 15 Nov 2026. The same run on Postgres is [below](#on-postgres). These results show the design meets the budget at this scale; they aren't a production benchmark.
 
 ## Results
 
@@ -43,6 +43,37 @@ python scripts/time_endpoints.py --runs 30
 | CSV export, all employees (not in the budget) | 248 | 266 | 271 | n/a |
 
 A filtered insight only reads the matching people, so a one-country view (India, about a quarter of the company) answers in under 100 ms. The company-wide summary is the slowest at 288 ms p95, up from 239 ms. Since the Insights filters were added it counts joiners and leavers from the same directory query as everything else, so they respect the filters, and that query now reads leavers too. It's the first endpoint to optimise if the budget tightens (see below).
+
+### On Postgres
+
+The same script against Postgres 16 (the `postgres:16-alpine` image, in Docker on the same laptop), measured 15 Nov 2026. Postgres is reached over a local TCP connection, so each query pays a small round trip that in-process SQLite doesn't.
+
+| Endpoint | p50 (ms) | p95 (ms) | max (ms) | Within 300 ms |
+|---|---:|---:|---:|:---:|
+| Directory, first page | 54 | 57 | 91 | yes |
+| Directory, India + Engineering | 24 | 28 | 51 | yes |
+| Directory, sorted by total pay (USD) | 53 | 55 | 57 | yes |
+| Directory, below band | 47 | 50 | 70 | yes |
+| Directory, name search | 16 | 17 | 21 | yes |
+| Profile | 18 | 19 | 20 | yes |
+| Compensation history | 5 | 5 | 5 | yes |
+| Insights summary | 274 | 293 | 321 | yes |
+| Breakdown by country | 249 | 272 | 378 | yes |
+| Breakdown by department | 248 | 265 | 269 | yes |
+| Breakdown by level | 249 | 269 | 332 | yes |
+| Band distribution | 244 | 259 | 264 | yes |
+| Summary, India in INR | 73 | 92 | 104 | yes |
+| Breakdown, India by department in INR | 70 | 88 | 88 | yes |
+| Pay distribution | 245 | 265 | 265 | yes |
+| Pay distribution, India in INR | 70 | 90 | 93 | yes |
+| Exceptions, below band | 259 | 275 | 278 | yes |
+| Exceptions, due soon | 256 | 280 | 290 | yes |
+| Recent changes | 12 | 14 | 33 | yes |
+| CSV export, all employees (not in the budget) | 277 | 297 | 299 | n/a |
+
+Every budgeted endpoint is still within 300 ms p95. The directory is slower than on SQLite (up to 57 ms) but well inside the budget, and the insights are within about 10–30 ms of SQLite, since most of their time is Python working through the rows. The company-wide summary (293 ms) remains the endpoint closest to the limit. On Render the database runs on a separate host, so expect a few more milliseconds per query. That hasn't been measured yet.
+
+Loading the seed into Postgres took 3.6 s.
 
 ## What makes it fast
 
