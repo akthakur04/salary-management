@@ -1,0 +1,38 @@
+# Render Blueprint: the API (Docker) and its Postgres database.
+# Create it from the Render dashboard: New > Blueprint > this repository.
+# Render asks for the values marked `sync: false`; see docs/DEPLOYMENT.md.
+databases:
+  - name: salary-db
+    databaseName: salary
+    user: salary
+    plan: free
+    region: virginia # next to Vercel's default region (iad1), so the proxy hop stays short
+
+services:
+  - type: web
+    name: salary-api
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: salary-db
+          property: connectionString
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: HR_ADMIN_EMAIL
+        sync: false
+      - key: HR_ADMIN_PASSWORD_HASH
+        sync: false
