@@ -4,23 +4,27 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=60 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10 \
     APP_ENV=production \
     PORT=8000
 
 WORKDIR /app
 
-# Dependencies first, so code changes don't reinstall them.
+# Dependencies first, so code changes don't reinstall them. pip's downloads
+# live in a build cache, outside the image: a build that fails part-way
+# (say, a network timeout) resumes from what it already fetched.
 COPY pyproject.toml ./
-RUN mkdir app && touch app/__init__.py && pip install . && rm -rf app build *.egg-info
+RUN --mount=type=cache,target=/root/.cache/pip \
+    mkdir app && touch app/__init__.py && pip install . && rm -rf app build *.egg-info
 
 COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./
 COPY scripts/start.sh ./scripts/start.sh
-RUN pip install --no-deps . && rm -rf build *.egg-info
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-deps . && rm -rf build *.egg-info
 
 RUN useradd --create-home --uid 10001 api
 USER api
