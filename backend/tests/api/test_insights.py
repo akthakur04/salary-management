@@ -43,8 +43,9 @@ def test_summary_reports_the_overview_kpis(signed_in: TestClient, company: dict[
         "headcount": 4,
         "joiners_this_quarter": 0,
         "leavers_this_quarter": 0,
-        "total_pay_usd": money(186_868_80, "USD"),
-        "median_pay_usd": money(34_958_40, "USD"),
+        "currency": "USD",
+        "total_pay": money(186_868_80, "USD"),
+        "median_pay": money(34_958_40, "USD"),
         "paid_within_band_percent": "66.7",
         "bonus_eligible_percent": "100.0",
         "variable_share_percent": "7.2",
@@ -81,7 +82,7 @@ def test_employee_without_a_package_counts_in_headcount_but_not_in_pay(
 
     assert summary["headcount"] == 5
     assert summary["employees_without_package"] == 1
-    assert summary["median_pay_usd"] == money(34_958_40, "USD")
+    assert summary["median_pay"] == money(34_958_40, "USD")
 
 
 def test_breakdown_by_country_gives_the_range_and_median_in_usd(
@@ -248,3 +249,106 @@ def test_band_exceptions_are_sorted_largest_gap_first_with_signed_percentages(
     (vikram,) = above["items"]
     assert vikram["band_maximum"] == money(lakh(38_00_000))
     assert (vikram["gap"], vikram["gap_percent"]) == (money(lakh(1_80_000)), "4.7")
+
+
+# Drilling in: filters, local currency and the pay distribution ----------------------------
+
+
+def test_summary_can_be_narrowed_to_one_country(
+    signed_in: TestClient, company: dict[str, int]
+) -> None:
+    summary = signed_in.get(f"{INSIGHTS}/summary", params={"country": "IN"}).json()
+
+    assert summary["headcount"] == 3
+    assert summary["total_pay"] == money(97_768_80, "USD")
+    assert summary["paid_within_band_percent"] == "50.0"
+
+
+def test_one_country_can_be_shown_in_its_own_currency(
+    signed_in: TestClient, company: dict[str, int]
+) -> None:
+    summary = signed_in.get(
+        f"{INSIGHTS}/summary", params={"country": "IN", "currency": "local"}
+    ).json()
+
+    assert summary["currency"] == "INR"
+    assert summary["total_pay"] == money(lakh(81_47_400))
+    assert summary["median_pay"] == money(lakh(28_00_000))
+
+
+def test_local_currency_needs_exactly_one_country(signed_in: TestClient) -> None:
+    response = signed_in.get(f"{INSIGHTS}/summary", params={"currency": "local"})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "LOCAL_CURRENCY_NEEDS_COUNTRY"
+
+
+def test_breakdown_within_one_country_in_local_currency(
+    signed_in: TestClient, company: dict[str, int]
+) -> None:
+    groups = signed_in.get(
+        f"{INSIGHTS}/breakdown",
+        params={"group_by": "department", "country": "IN", "currency": "local"},
+    ).json()
+
+    assert groups == [
+        {
+            "key": "Engineering",
+            "label": "Engineering",
+            "headcount": 3,
+            "minimum": money(lakh(23_21_000)),
+            "median": money(lakh(28_00_000)),
+            "mean": money(lakh(27_15_800)),
+            "maximum": money(lakh(30_26_400)),
+            "variable_share_percent": "5.5",
+        }
+    ]
+
+
+def test_employment_type_narrows_every_insight(
+    signed_in: TestClient, company: dict[str, int]
+) -> None:
+    params = {"employment_type": "contractor"}
+
+    summary = signed_in.get(f"{INSIGHTS}/summary", params=params).json()
+    bands = signed_in.get(f"{INSIGHTS}/band-distribution", params=params).json()
+
+    assert summary["headcount"] == 1
+    assert summary["paid_within_band_percent"] is None
+    assert bands == []
+
+
+def test_joiners_and_leavers_are_counted_within_the_selection(
+    signed_in: TestClient, company: dict[str, int], db: Session, reference: Reference
+) -> None:
+    EmployeeService(db).hire(
+        hire_request(
+            reference,
+            employee_code="EMP-09121",
+            name="Sneha Patil",
+            email="sneha@acme.example",
+            hire_date=date(2026, 10, 5),
+        )
+    )
+    EmployeeService(db).terminate(company["hannah"], date(2026, 10, 31))
+
+    india = signed_in.get(f"{INSIGHTS}/summary", params={"country": "IN"}).json()
+    germany = signed_in.get(f"{INSIGHTS}/summary", params={"country": "DE"}).json()
+
+    assert (india["joiners_this_quarter"], india["leavers_this_quarter"]) == (1, 0)
+    assert (germany["joiners_this_quarter"], germany["leavers_this_quarter"]) == (0, 1)
+
+
+def test_pay_distribution_counts_people_in_round_brackets(
+    signed_in: TestClient, company: dict[str, int]
+) -> None:
+    response = signed_in.get(
+        f"{INSIGHTS}/pay-distribution", params={"country": "IN", "currency": "local"}
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["currency"] == "INR"
+    assert sum(bucket["count"] for bucket in body["buckets"]) == 3
+    widths = {b["upper"]["amount_minor"] - b["lower"]["amount_minor"] for b in body["buckets"]}
+    assert len(widths) == 1
