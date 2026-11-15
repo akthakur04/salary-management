@@ -296,13 +296,13 @@ export default function OverviewPage() {
         </KpiCard>
         <KpiCard
           label="Total annual pay (target)"
-          value={data ? formatCompactUsd(data.total_pay_usd.amount_minor) : undefined}
+          value={data ? formatCompactUsd(data.total_pay.amount_minor) : undefined}
         >
           <span className="text-xs text-muted-foreground">Base + allowances + target variable</span>
         </KpiCard>
         <KpiCard
           label="Median total pay"
-          value={data ? (data.median_pay_usd ? formatMoney(data.median_pay_usd) : "—") : undefined}
+          value={data ? (data.median_pay ? formatMoney(data.median_pay) : "—") : undefined}
         >
           <span className="text-xs text-muted-foreground">Across all countries, in USD</span>
         </KpiCard>

@@ -1,13 +1,13 @@
 """Queries for insights that the directory query doesn't already answer."""
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.versions import ChangeReason
-from app.models import CompensationVersion, Employee
+from app.models import CompensationVersion
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,16 +23,6 @@ class DueChange:
 class InsightsRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
-
-    def joiners_between(self, start: date, end: date) -> int:
-        return self._count(Employee.hire_date >= start, Employee.hire_date <= end)
-
-    def leavers_between(self, start: date, end: date) -> int:
-        """Employees whose last day fell in the period (they left the day after)."""
-        return self._count(
-            Employee.termination_date >= start - timedelta(days=1),
-            Employee.termination_date < end,
-        )
 
     def changes_due(self, after: date, until: date) -> list[DueChange]:
         rows = self._session.execute(
@@ -68,7 +58,3 @@ class InsightsRepository:
             .limit(limit)
         )
         return [(employee_id, version_id) for employee_id, version_id in rows]
-
-    def _count(self, *conditions: ColumnElement[bool]) -> int:
-        statement = select(func.count()).select_from(Employee).where(*conditions)
-        return self._session.scalar(statement) or 0

@@ -1,4 +1,8 @@
-"""Response models for the insights endpoints. All pay figures are USD at reference rates."""
+"""Response models for the insights endpoints.
+
+Pay figures are USD at reference rates, or the local currency when one country is
+selected and the caller asks for it.
+"""
 
 from datetime import date
 
@@ -14,6 +18,7 @@ from app.services.insights import (
     ExceptionCounts,
     ExceptionItem,
     ExceptionType,
+    PayDistribution,
     PayGroup,
     RecentChange,
     Summary,
@@ -25,8 +30,9 @@ class SummaryOut(BaseModel):
     headcount: int
     joiners_this_quarter: int
     leavers_this_quarter: int
-    total_pay_usd: MoneyOut
-    median_pay_usd: MoneyOut | None
+    currency: str
+    total_pay: MoneyOut
+    median_pay: MoneyOut | None
     paid_within_band_percent: OneDecimal | None
     bonus_eligible_percent: OneDecimal | None
     variable_share_percent: OneDecimal | None
@@ -39,8 +45,9 @@ class SummaryOut(BaseModel):
             headcount=summary.headcount,
             joiners_this_quarter=summary.joiners_this_quarter,
             leavers_this_quarter=summary.leavers_this_quarter,
-            total_pay_usd=MoneyOut.of(summary.total_pay_usd),
-            median_pay_usd=MoneyOut.maybe(summary.median_pay_usd),
+            currency=summary.currency,
+            total_pay=MoneyOut.of(summary.total_pay),
+            median_pay=MoneyOut.maybe(summary.median_pay),
             paid_within_band_percent=summary.paid_within_band_percent,
             bonus_eligible_percent=summary.bonus_eligible_percent,
             variable_share_percent=summary.variable_share_percent,
@@ -48,8 +55,8 @@ class SummaryOut(BaseModel):
         )
 
 
-def _usd(amount_minor: int) -> MoneyOut:
-    return MoneyOut.of(Money(amount_minor, "USD"))
+def _money(amount_minor: int, currency: str) -> MoneyOut:
+    return MoneyOut.of(Money(amount_minor, currency))
 
 
 class PayGroupOut(BaseModel):
@@ -64,16 +71,42 @@ class PayGroupOut(BaseModel):
 
     @classmethod
     def of(cls, group: PayGroup) -> "PayGroupOut":
-        summary = group.summary
+        summary, currency = group.summary, group.currency
         return cls(
             key=group.key,
             label=group.label,
             headcount=summary.count,
-            minimum=_usd(summary.minimum),
-            median=_usd(summary.median),
-            mean=_usd(summary.mean),
-            maximum=_usd(summary.maximum),
+            minimum=_money(summary.minimum, currency),
+            median=_money(summary.median, currency),
+            mean=_money(summary.mean, currency),
+            maximum=_money(summary.maximum, currency),
             variable_share_percent=group.variable_share_percent,
+        )
+
+
+class PayBucketOut(BaseModel):
+    lower: MoneyOut
+    upper: MoneyOut
+    count: int
+
+
+class PayDistributionOut(BaseModel):
+    currency: str
+    buckets: list[PayBucketOut]
+
+    @classmethod
+    def of(cls, distribution: PayDistribution) -> "PayDistributionOut":
+        currency = distribution.currency
+        return cls(
+            currency=currency,
+            buckets=[
+                PayBucketOut(
+                    lower=_money(bucket.lower, currency),
+                    upper=_money(bucket.upper, currency),
+                    count=bucket.count,
+                )
+                for bucket in distribution.buckets
+            ],
         )
 
 
