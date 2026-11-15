@@ -49,6 +49,16 @@ def _endpoints(ravi_id: int) -> list[tuple[str, str]]:
         ("Breakdown by department", f"{insights}/breakdown?group_by=department"),
         ("Breakdown by level", f"{insights}/breakdown?group_by=level"),
         ("Band distribution", f"{insights}/band-distribution"),
+        ("Summary, India in INR", f"{insights}/summary?country=IN&currency=local"),
+        (
+            "Breakdown, India by department in INR",
+            f"{insights}/breakdown?group_by=department&country=IN&currency=local",
+        ),
+        ("Pay distribution", f"{insights}/pay-distribution"),
+        (
+            "Pay distribution, India in INR",
+            f"{insights}/pay-distribution?country=IN&currency=local",
+        ),
         ("Exceptions, below band", f"{insights}/exceptions?type=below"),
         ("Exceptions, due soon", f"{insights}/exceptions?type=pending"),
         ("Recent changes", f"{insights}/recent-changes"),

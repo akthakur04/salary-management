@@ -293,3 +293,49 @@ Two generated-code issues were checked rather than assumed:
   - Ravi's profile showed ₹30,26,400, a compa-ratio of 0.89 and a four-step history.
 - **The Revise demo:** with the defaults (promote to L4, +12%, bonus 15%), the server preview showed ₹26,88,000, total pay ₹34,77,600, a compa-ratio of 0.81 and the amber "₹1,12,000 short of the minimum" warning. A 150% bonus was rejected inline. After review → confirm, the change was saved as pending for 1 Jan 2027, and the Exceptions badge went from 1,488 to 1,489.
 - **The rest of the journey:** the Exceptions tabs and the Insights grouping work. Hiring a new employee led to their profile, and Sign out ended the session (the API then answered 401). No console errors appeared on any screen in a fresh tab.
+
+## After Phase 6: Insights drill-down
+
+**Request (from the candidate, on seeing the Insights page):** let the HR Manager pick one country, such as India, and see how many people are there and how they're paid, "or something more granular".
+
+The AI asked four questions before building. The candidate chose:
+
+- filters for country, department, level and employment type, single-select and kept in the URL
+- local currency when one country is selected, with a USD toggle
+- all three extras: KPI cards for the selection, a link to those employees, and a pay-distribution chart
+- a separate pull request once Phase 6 had merged
+
+**Work, test-first:**
+
+- `pay_histogram` in the domain: equal brackets with round widths, failing tests first
+- API tests for filtered summaries, local currency, the 422 without a country, employment type, joiners and leavers within a selection, and the new `/insights/pay-distribution`
+- frontend tests for the URL helpers, the group options left after filtering, and compact lakh / crore amounts
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| The summary's `total_pay_usd` and `median_pay_usd` were renamed to `total_pay` and `median_pay`, with a `currency` field | They can now be in a local currency, so a `_usd` name would lie. The Overview was updated in the same commit. This changes an existing response shape; the only client is this frontend. |
+| Local currency is reported as stored, with no conversion | Every person in one country is paid in its currency (E-rules on currency per country), so local totals need no FX at all. `local` without a country is an error rather than silently falling back to USD. |
+| Joiners and leavers come from the directory query | The old counts ignored filters. Reading them from the same query keeps every KPI on the same people; the unused repository counts were removed. |
+| A grouping already narrowed to one value is left out of the group-by switcher | Grouping India by country shows one row. When every grouping is narrowed, the page says so instead of drawing empty charts. |
+| The mix and band panels follow the chosen grouping | Before, they were fixed to department. A drill-down into one department would otherwise show one bar. |
+| `FilterSelect` moved to `components/` | Both filter bars use it now. |
+
+### Corrections during the work
+
+Found in the preview browser, not by the tests:
+
+- **The directory link's count didn't match.** "View these 822 employees" opened a directory showing 823. The extra person was a test hire starting on 1 Dec: the directory lists future starters, while insights count only people who have started. The link now reads "See these employees in the directory", with no count.
+- **The header contradicted the page.** It said "USD at reference rates" above figures in rupees. On Insights the header now leaves the currency to the page heading.
+- **"1 people"** in the histogram tooltip and its screen-reader table.
+
+### How the output was verified
+
+- **Checks:** backend ruff, mypy (strict) and pytest pass, with domain coverage at 100%. Frontend lint, typecheck and 62 Vitest tests pass.
+- **Browser, against the full seed:**
+  - India: 2,634 people, a median of ₹22,59,150 (shown as $27,110 in USD), and ₹10 L histogram brackets.
+  - Germany, Engineering, L3 in EUR: "Nothing left to compare" appears where the groupings would be.
+  - Contractors only: no band figures, with "—" for paid within band.
+  - The directory link and CSV export carry the same filters, and the Overview still loads with no console errors.
+- **Timing:** filtered insight endpoints run under 100 ms p95. The company-wide summary rose from 239 to 288 ms p95, still within the 300 ms budget ([PERFORMANCE.md](PERFORMANCE.md)).

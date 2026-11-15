@@ -2,7 +2,7 @@
 
 **Budget** (REQUIREMENTS §6, ARCHITECTURE §6): p95 under **300 ms** for the list and insight endpoints, with 10,000 employees and their compensation history.
 
-**Result: every budgeted endpoint is within it.** The directory and profile endpoints answer in 2–22 ms (p95). The insight endpoints are at about 230–260 ms, so they're the ones to watch.
+**Result: every budgeted endpoint is within it.** The directory and profile endpoints answer in 7–40 ms (p95). Company-wide insight endpoints are at about 240–290 ms, so they're the ones to watch; filtered ones are well under 100 ms.
 
 ## How it was measured
 
@@ -15,28 +15,34 @@ python scripts/time_endpoints.py --runs 30
 
 - **Data:** the full seed (10,000 employees, 26,776 compensation versions, 32,249 components), as of 12 Nov 2026.
 - **What's timed:** requests go through the whole app in-process (routing, the session check, validation, the database, the domain calculations and serialisation), but not over a network. The numbers are server time. Each endpoint gets 3 warm-up requests, then 30 timed ones.
-- **Environment:** SQLite 3.49 on an Apple M4 laptop, Python 3.12, measured 14 Nov 2026. Postgres on Render will differ. These results show the design meets the budget at this scale; they aren't a production benchmark.
+- **Environment:** SQLite 3.49 on an Apple M4 laptop, Python 3.12, measured 15 Nov 2026. Postgres on Render will differ. These results show the design meets the budget at this scale; they aren't a production benchmark.
 
 ## Results
 
 | Endpoint | p50 (ms) | p95 (ms) | max (ms) | Within 300 ms |
 |---|---:|---:|---:|:---:|
-| Directory, first page | 12 | 14 | 22 | yes |
-| Directory, India + Engineering | 9 | 17 | 27 | yes |
-| Directory, sorted by total pay (USD) | 21 | 22 | 22 | yes |
-| Directory, below band | 18 | 19 | 35 | yes |
-| Directory, name search | 10 | 11 | 11 | yes |
-| Profile | 9 | 10 | 29 | yes |
-| Compensation history | 2 | 2 | 2 | yes |
-| Insights summary | 219 | 239 | 246 | yes |
-| Breakdown by country | 216 | 234 | 240 | yes |
-| Breakdown by department | 220 | 239 | 268 | yes |
-| Breakdown by level | 220 | 235 | 246 | yes |
-| Band distribution | 216 | 231 | 233 | yes |
-| Exceptions, below band | 222 | 261 | 333 | yes |
-| Exceptions, due soon | 223 | 238 | 249 | yes |
-| Recent changes | 6 | 6 | 6 | yes |
-| CSV export, all employees (not in the budget) | 241 | 260 | 281 | n/a |
+| Directory, first page | 14 | 15 | 16 | yes |
+| Directory, India + Engineering | 11 | 11 | 30 | yes |
+| Directory, sorted by total pay (USD) | 23 | 25 | 35 | yes |
+| Directory, below band | 22 | 40 | 45 | yes |
+| Directory, name search | 11 | 14 | 16 | yes |
+| Profile | 10 | 11 | 11 | yes |
+| Compensation history | 3 | 8 | 10 | yes |
+| Insights summary | 257 | 288 | 313 | yes |
+| Breakdown by country | 224 | 241 | 244 | yes |
+| Breakdown by department | 233 | 252 | 270 | yes |
+| Breakdown by level | 230 | 264 | 365 | yes |
+| Band distribution | 228 | 265 | 309 | yes |
+| Summary, India in INR | 72 | 96 | 106 | yes |
+| Breakdown, India by department in INR | 67 | 89 | 103 | yes |
+| Pay distribution | 218 | 241 | 251 | yes |
+| Pay distribution, India in INR | 66 | 89 | 99 | yes |
+| Exceptions, below band | 228 | 245 | 248 | yes |
+| Exceptions, due soon | 229 | 248 | 274 | yes |
+| Recent changes | 6 | 7 | 25 | yes |
+| CSV export, all employees (not in the budget) | 248 | 266 | 271 | n/a |
+
+A filtered insight only reads the matching people, so a one-country view (India, about a quarter of the company) answers in under 100 ms. The company-wide summary is the slowest at 288 ms p95, up from 239 ms. Since the Insights filters were added it counts joiners and leavers from the same directory query as everything else, so they respect the filters, and that query now reads leavers too. It's the first endpoint to optimise if the budget tightens (see below).
 
 ## What makes it fast
 
