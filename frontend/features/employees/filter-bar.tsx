@@ -3,61 +3,15 @@
 import { SearchIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/filter-select";
 import { bandLabel } from "@/components/band-status";
 import { BAND_VALUES, type Filters } from "@/lib/filters";
 import { EMPLOYMENT_TYPE_LABELS, STATUS_LABELS } from "@/lib/format";
 import { useCountries, useDepartments } from "@/lib/queries";
 import type { BandPosition, EmploymentStatus, EmploymentType } from "@/lib/types";
 import { useDebounced } from "@/lib/use-debounced";
-import { cn } from "@/lib/utils";
 
 type FilterKey = "country" | "department" | "level" | "type" | "band" | "status";
-
-const ANY = "__any";
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
-}) {
-  const chosen = options.find((option) => option.value === value);
-  return (
-    <Select value={value || ANY} onValueChange={(next) => onChange(next === ANY ? "" : next)}>
-      <SelectTrigger
-        aria-label={label}
-        className={cn(
-          "h-9 rounded-lg text-[13px]",
-          chosen
-            ? "border-[#C9CDEB] bg-primary-tint text-primary-strong"
-            : "border-dashed border-input bg-card text-subtle-foreground",
-        )}
-      >
-        <SelectValue>{chosen ? `${label}: ${chosen.label}` : label}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ANY}>Any {label.toLowerCase()}</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 export function FilterBar({
   filters,

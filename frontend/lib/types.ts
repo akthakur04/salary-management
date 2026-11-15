@@ -157,6 +157,10 @@ export type PayGroup = {
   variable_share_percent: string | null;
 };
 
+export type PayBucket = { lower: Money; upper: Money; count: number };
+
+export type PayDistribution = { currency: string; buckets: PayBucket[] };
+
 export type BandGroup = {
   key: string;
   label: string;

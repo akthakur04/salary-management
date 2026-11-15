@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import {
   ChartContainer,
@@ -10,7 +10,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import type { BandGroup, PayGroup } from "@/lib/types";
+import { formatCompactMoney, formatMoney } from "@/lib/format";
+import type { BandGroup, PayBucket, PayGroup } from "@/lib/types";
 
 /** Recharts via shadcn charts, themed with the design tokens. Each chart also has a data table for screen readers. */
 
@@ -88,6 +89,58 @@ export function BandChart({ groups }: { groups: BandGroup[] }) {
               <td>{group.below}</td>
               <td>{group.in_band}</td>
               <td>{group.above}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+const histogramConfig = {
+  count: { label: "People", color: "var(--primary)" },
+} satisfies ChartConfig;
+
+function people(count: number): string {
+  return `${count.toLocaleString("en-US")} ${count === 1 ? "person" : "people"}`;
+}
+
+function bracket(bucket: PayBucket): string {
+  return `${formatMoney(bucket.lower)} to under ${formatMoney(bucket.upper)}`;
+}
+
+export function PayHistogram({ buckets }: { buckets: PayBucket[] }) {
+  const data = buckets.map((bucket) => ({
+    name: formatCompactMoney(bucket.lower, 0),
+    range: bracket(bucket),
+    count: bucket.count,
+  }));
+  return (
+    <>
+      <ChartContainer config={histogramConfig} className="aspect-auto h-64 w-full" aria-hidden="true">
+        <BarChart data={data} barCategoryGap={2} margin={{ left: 0, right: 8, top: 8 }}>
+          <CartesianGrid vertical={false} />
+          <XAxis dataKey="name" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={12} />
+          <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={44} />
+          <ChartTooltip
+            cursor={{ fill: "var(--muted)" }}
+            content={
+              <ChartTooltipContent
+                labelFormatter={(_, items) => items[0]?.payload.range}
+                formatter={(value) => people(Number(value))}
+              />
+            }
+          />
+          <Bar dataKey="count" fill="var(--color-count)" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ChartContainer>
+      <table className="sr-only">
+        <caption>Number of people by total target pay</caption>
+        <tbody>
+          {data.map((row) => (
+            <tr key={row.range}>
+              <th scope="row">{row.range}</th>
+              <td>{people(row.count)}</td>
             </tr>
           ))}
         </tbody>

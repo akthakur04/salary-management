@@ -1,27 +1,39 @@
 "use client";
 
-import { DownloadIcon } from "lucide-react";
+import { ArrowRightIcon, DownloadIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { FilterSelect } from "@/components/filter-select";
 import { PageHeading, Panel } from "@/components/page-heading";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/states";
 import { Button } from "@/components/ui/button";
-import { BandChart, MixChart } from "@/features/insights/charts";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BandChart, MixChart, PayHistogram } from "@/features/insights/charts";
 import { exportUrl } from "@/lib/api";
-import { formatMoney, formatPercent } from "@/lib/format";
-import { useBandDistribution, useBreakdown } from "@/lib/queries";
-import type { PayGroup } from "@/lib/types";
+import { EMPLOYMENT_TYPE_LABELS, formatCompactMoney, formatMoney, formatPercent } from "@/lib/format";
+import {
+  activeGroup,
+  directoryHref,
+  groupOptions,
+  insightApiParams,
+  insightFiltersFromParams,
+  insightFiltersToParams,
+  showsLocalCurrency,
+  type GroupKey,
+  type InsightFilters,
+} from "@/lib/insight-filters";
+import {
+  useBandDistribution,
+  useBreakdown,
+  useCountries,
+  useDepartments,
+  usePayDistribution,
+  useSummary,
+} from "@/lib/queries";
+import type { EmploymentType, PayGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const GROUPS = [
-  { key: "country", label: "Country" },
-  { key: "department", label: "Department" },
-  { key: "level", label: "Level" },
-] as const;
-
-type GroupKey = (typeof GROUPS)[number]["key"];
 
 /** Levels read best in order (L1 to L5, then contractors); other groupings by median, highest first. */
 function ordered(groups: PayGroup[], group: GroupKey): PayGroup[] {
@@ -70,15 +82,145 @@ function RangeTable({ groups, groupLabel }: { groups: PayGroup[]; groupLabel: st
   );
 }
 
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: readonly { key: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex gap-1 rounded-[10px] bg-muted p-1">
+      {options.map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          aria-pressed={option.key === value}
+          onClick={() => onChange(option.key)}
+          className={cn(
+            "h-8 rounded-lg px-3 text-[13px]",
+            option.key === value ? "bg-card font-semibold text-foreground shadow-sm" : "text-subtle-foreground hover:text-foreground",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function InsightFilterBar({
+  filters,
+  localCurrency,
+  onChange,
+}: {
+  filters: InsightFilters;
+  localCurrency: string | undefined;
+  onChange: (changes: Partial<InsightFilters>) => void;
+}) {
+  const countries = useCountries();
+  const departments = useDepartments();
+  const anyFilter = filters.country || filters.department || filters.level || filters.type;
+  return (
+    <section aria-label="Filters" className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+      <FilterSelect
+        label="Country"
+        value={filters.country}
+        onChange={(country) => onChange({ country })}
+        options={(countries.data ?? []).map((c) => ({ value: c.code, label: c.name }))}
+      />
+      <FilterSelect
+        label="Department"
+        value={filters.department}
+        onChange={(department) => onChange({ department })}
+        options={(departments.data ?? []).map((d) => ({ value: String(d.id), label: d.name }))}
+      />
+      <FilterSelect
+        label="Level"
+        value={filters.level}
+        onChange={(level) => onChange({ level })}
+        options={["1", "2", "3", "4", "5"].map((level) => ({ value: level, label: `L${level}` }))}
+      />
+      <FilterSelect
+        label="Employment type"
+        value={filters.type}
+        onChange={(type) => onChange({ type })}
+        options={(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((type) => ({
+          value: type,
+          label: EMPLOYMENT_TYPE_LABELS[type],
+        }))}
+      />
+      {anyFilter ? (
+        <button
+          type="button"
+          onClick={() => onChange({ country: "", department: "", level: "", type: "" })}
+          className="h-9 px-2 text-[13px] text-primary underline"
+        >
+          Clear
+        </button>
+      ) : null}
+      {filters.country && localCurrency && localCurrency !== "USD" ? (
+        <div className="ml-auto">
+          <Segmented
+            label="Currency"
+            value={filters.currency}
+            onChange={(currency) => onChange({ currency })}
+            options={[
+              { key: "local", label: localCurrency },
+              { key: "usd", label: "USD" },
+            ]}
+          />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function KpiCard({ label, value, children }: { label: string; value: string | undefined; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border bg-card p-5">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
+      {value === undefined ? (
+        <Skeleton className="h-9 w-28" />
+      ) : (
+        <span className="amount text-[28px] leading-tight font-medium tracking-tight">{value}</span>
+      )}
+      {children}
+    </div>
+  );
+}
+
 function InsightsView() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const group: GroupKey = GROUPS.some((g) => g.key === params.get("group")) ? (params.get("group") as GroupKey) : "country";
-  const groupLabel = GROUPS.find((g) => g.key === group)?.label ?? "Country";
-  const breakdown = useBreakdown(group);
-  const mix = useBreakdown("department");
-  const bands = useBandDistribution("department");
+  const filters = insightFiltersFromParams(new URLSearchParams(params.toString()));
+  const countries = useCountries();
+  const localCurrency = countries.data?.find((c) => c.code === filters.country)?.currency;
+  const api = insightApiParams(filters).toString();
+  const group = activeGroup(filters);
+  const options = groupOptions(filters);
+  const groupLabel = options.find((o) => o.key === group)?.label ?? "";
+
+  const summary = useSummary(api);
+  const distribution = usePayDistribution(api);
+  const breakdown = useBreakdown(group ?? "country", api);
+  const bands = useBandDistribution(group ?? "department", api);
+
+  const update = (changes: Partial<InsightFilters>) => {
+    const next = insightFiltersToParams({ ...filters, ...changes }).toString();
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+  };
+
+  const exportParams = new URLSearchParams(api);
+  exportParams.delete("currency");
+  const data = summary.data;
+  const currencyNote = showsLocalCurrency(filters) && localCurrency ? `in ${localCurrency}` : "in USD at reference rates";
+  const narrowed = filters.country || filters.department || filters.level || filters.type;
 
   return (
     <>
@@ -86,88 +228,129 @@ function InsightsView() {
         title="How ACME pays people"
         actions={
           <Button variant="outline" asChild className="h-10 bg-card px-3.5">
-            <a href={exportUrl(new URLSearchParams())} download className="text-foreground hover:text-foreground">
+            <a href={exportUrl(exportParams)} download className="text-foreground hover:text-foreground">
               <DownloadIcon aria-hidden="true" />
               Export CSV
             </a>
           </Button>
         }
       >
-        Compare pay across countries, departments and levels. Active employees, total target pay in USD at reference
-        rates.
+        Narrow to a country, department, level or employment type to see its pattern. Active employees, total target
+        pay {currencyNote}.
       </PageHeading>
 
-      <Panel
-        title={`Total pay by ${groupLabel.toLowerCase()}`}
-        id="by-group"
-        aside={
-          <div role="group" aria-label="Group by" className="flex gap-1 rounded-[10px] bg-muted p-1">
-            {GROUPS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                aria-pressed={option.key === group}
-                onClick={() => router.replace(`${pathname}?group=${option.key}`, { scroll: false })}
-                className={cn(
-                  "h-9 rounded-lg px-3.5 text-[13px]",
-                  option.key === group ? "bg-card font-semibold text-foreground shadow-sm" : "text-subtle-foreground hover:text-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        }
+      <InsightFilterBar filters={filters} localCurrency={localCurrency} onChange={update} />
+
+      {summary.isError ? <ErrorState error={summary.error} onRetry={() => summary.refetch()} /> : null}
+
+      <section
+        aria-label="Key figures for this selection"
+        className={cn("grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4", summary.isPlaceholderData && "opacity-60")}
       >
-        {breakdown.isError ? (
-          <ErrorState error={breakdown.error} onRetry={() => breakdown.refetch()} />
-        ) : !breakdown.data ? (
-          <LoadingRows rows={8} />
-        ) : breakdown.data.length === 0 ? (
-          <EmptyState title="No pay recorded yet" />
+        <KpiCard label="Active headcount" value={data?.headcount.toLocaleString("en-US")}>
+          {data ? (
+            <span className="text-xs text-muted-foreground">
+              +{data.joiners_this_quarter} joiners, −{data.leavers_this_quarter} leavers this quarter
+            </span>
+          ) : null}
+        </KpiCard>
+        <KpiCard label="Median total pay" value={data ? (data.median_pay ? formatMoney(data.median_pay) : "—") : undefined} />
+        <KpiCard label="Total annual pay (target)" value={data ? formatCompactMoney(data.total_pay) : undefined}>
+          {data ? (
+            <span className="text-xs text-muted-foreground">Variable share {formatPercent(data.variable_share_percent)}</span>
+          ) : null}
+        </KpiCard>
+        <KpiCard label="Paid within band" value={data ? formatPercent(data.paid_within_band_percent) : undefined}>
+          {data ? (
+            <span className="text-xs text-muted-foreground">Bonus eligible {formatPercent(data.bonus_eligible_percent)}</span>
+          ) : null}
+        </KpiCard>
+      </section>
+
+      {data && narrowed ? (
+        <p className="-mt-2 text-sm">
+          <Link href={directoryHref(filters)} className="inline-flex items-center gap-1">
+            {/* No count here: the directory also lists people who haven't started yet. */}
+            See these employees in the directory
+            <ArrowRightIcon aria-hidden="true" className="size-3.5" />
+          </Link>
+        </p>
+      ) : null}
+
+      <Panel title="Pay distribution" id="distribution" aside="People by total target pay">
+        {distribution.isError ? (
+          <ErrorState error={distribution.error} onRetry={() => distribution.refetch()} />
+        ) : !distribution.data ? (
+          <LoadingRows rows={6} />
+        ) : distribution.data.buckets.length === 0 ? (
+          <EmptyState title="No pay recorded for this selection" />
         ) : (
-          <div className={cn(breakdown.isPlaceholderData && "opacity-60")}>
-            <RangeTable groups={ordered(breakdown.data, group)} groupLabel={groupLabel} />
+          <div className={cn(distribution.isPlaceholderData && "opacity-60")}>
+            <PayHistogram buckets={distribution.data.buckets} />
           </div>
         )}
       </Panel>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(420px,1fr))] gap-4">
-        <Panel title="Fixed vs. variable pay" id="mix" aside="Share of total target pay, by department">
-          {mix.isError ? (
-            <ErrorState error={mix.error} onRetry={() => mix.refetch()} />
-          ) : !mix.data ? (
-            <LoadingRows rows={6} />
-          ) : mix.data.length === 0 ? (
-            <EmptyState title="No pay recorded yet" />
-          ) : (
-            <MixChart groups={mix.data} />
-          )}
-        </Panel>
-        <Panel title="Position against pay bands" id="bands" aside={<Link href="/exceptions">See exceptions</Link>}>
-          {bands.isError ? (
-            <ErrorState error={bands.error} onRetry={() => bands.refetch()} />
-          ) : !bands.data ? (
-            <LoadingRows rows={6} />
-          ) : bands.data.length === 0 ? (
-            <EmptyState title="No banded employees yet" />
-          ) : (
-            <>
-              <BandChart groups={bands.data} />
-              <p className="text-xs text-muted-foreground">
-                In band overall:{" "}
-                {formatPercent(
-                  (() => {
-                    const totals = bands.data.reduce((sum, g) => ({ in: sum.in + g.in_band, all: sum.all + g.banded }), { in: 0, all: 0 });
-                    return totals.all ? ((totals.in * 100) / totals.all).toFixed(1) : null;
-                  })(),
-                )}
-                . Contractors aren&apos;t banded and are left out.
-              </p>
-            </>
-          )}
-        </Panel>
-      </div>
+      {group === null ? (
+        <EmptyState title="Nothing left to compare">
+          Every grouping is narrowed to one value. Clear a country, department or level filter to compare groups.
+        </EmptyState>
+      ) : (
+        <>
+          <Panel
+            title={`Total pay by ${groupLabel.toLowerCase()}`}
+            id="by-group"
+            aside={
+              options.length > 1 ? (
+                <Segmented label="Group by" value={group} options={options} onChange={(next) => update({ group: next })} />
+              ) : null
+            }
+          >
+            {breakdown.isError ? (
+              <ErrorState error={breakdown.error} onRetry={() => breakdown.refetch()} />
+            ) : !breakdown.data ? (
+              <LoadingRows rows={8} />
+            ) : breakdown.data.length === 0 ? (
+              <EmptyState title="No pay recorded for this selection" />
+            ) : (
+              <div className={cn(breakdown.isPlaceholderData && "opacity-60")}>
+                <RangeTable groups={ordered(breakdown.data, group)} groupLabel={groupLabel} />
+              </div>
+            )}
+          </Panel>
+
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(420px,1fr))] gap-4">
+            <Panel title="Fixed vs. variable pay" id="mix" aside={`Share of total target pay, by ${groupLabel.toLowerCase()}`}>
+              {breakdown.isError ? (
+                <ErrorState error={breakdown.error} onRetry={() => breakdown.refetch()} />
+              ) : !breakdown.data ? (
+                <LoadingRows rows={6} />
+              ) : breakdown.data.length === 0 ? (
+                <EmptyState title="No pay recorded for this selection" />
+              ) : (
+                <MixChart groups={ordered(breakdown.data, group)} />
+              )}
+            </Panel>
+            <Panel title="Position against pay bands" id="bands" aside={<Link href="/exceptions">See exceptions</Link>}>
+              {bands.isError ? (
+                <ErrorState error={bands.error} onRetry={() => bands.refetch()} />
+              ) : !bands.data ? (
+                <LoadingRows rows={6} />
+              ) : bands.data.length === 0 ? (
+                <EmptyState title="No banded employees in this selection" />
+              ) : (
+                <>
+                  <BandChart groups={bands.data} />
+                  <p className="text-xs text-muted-foreground">
+                    In band overall: {formatPercent(data?.paid_within_band_percent ?? null)}. Contractors aren&apos;t
+                    banded and are left out.
+                  </p>
+                </>
+              )}
+            </Panel>
+          </div>
+        </>
+      )}
     </>
   );
 }

@@ -16,6 +16,7 @@ import type {
   HistoryEntry,
   Page,
   PayBandListing,
+  PayDistribution,
   PayGroup,
   Preview,
   RecentChange,
@@ -99,10 +100,21 @@ export function useHistory(id: number) {
   });
 }
 
-export function useSummary() {
+/** `filters` is a query string from insightApiParams; empty for the whole company in USD. */
+export function useSummary(filters = "") {
   return useQuery({
-    queryKey: [...keys.insights, "summary"],
-    queryFn: () => api.get<Summary>("/insights/summary"),
+    queryKey: [...keys.insights, "summary", filters],
+    queryFn: () => api.get<Summary>(`/insights/summary${filters ? `?${filters}` : ""}`),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function usePayDistribution(filters = "") {
+  return useQuery({
+    queryKey: [...keys.insights, "pay-distribution", filters],
+    queryFn: () =>
+      api.get<PayDistribution>(`/insights/pay-distribution${filters ? `?${filters}` : ""}`),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -131,10 +143,13 @@ export function useBreakdown(groupBy: string, filters = "") {
   });
 }
 
-export function useBandDistribution(groupBy: string) {
+export function useBandDistribution(groupBy: string, filters = "") {
   return useQuery({
-    queryKey: [...keys.insights, "bands", groupBy],
-    queryFn: () => api.get<BandGroup[]>(`/insights/band-distribution?group_by=${groupBy}`),
+    queryKey: [...keys.insights, "bands", groupBy, filters],
+    queryFn: () =>
+      api.get<BandGroup[]>(
+        `/insights/band-distribution?group_by=${groupBy}${filters ? `&${filters}` : ""}`,
+      ),
     placeholderData: keepPreviousData,
   });
 }
