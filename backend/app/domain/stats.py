@@ -25,6 +25,15 @@ class PaySummary:
 
 
 @dataclass(frozen=True, slots=True)
+class PayBucket:
+    """People paid at least `lower` and less than `upper` (minor units)."""
+
+    lower: int
+    upper: int
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
 class BandDistribution:
     below: int
     in_band: int
@@ -64,6 +73,40 @@ def share_percent(part: int | Decimal, whole: int | Decimal) -> Decimal | None:
     if whole == 0:
         return None
     return (Decimal(part) * 100 / Decimal(whole)).quantize(_ONE_DECIMAL, rounding=ROUND_HALF_EVEN)
+
+
+_NICE_STEPS = (1, 2, Decimal("2.5"), 5, 10)
+
+
+def pay_histogram(
+    amounts_minor: Iterable[int | None], target_buckets: int = 12
+) -> tuple[PayBucket, ...]:
+    """Group pay into equal brackets with round widths (1, 2, 2.5 or 5 x a power of ten).
+
+    People without a package (None) are left out. The highest amount always
+    falls inside the last bracket.
+    """
+    values = sorted(amount for amount in amounts_minor if amount is not None)
+    if not values:
+        return ()
+    low, high = values[0], values[-1]
+    if low == high:
+        return (PayBucket(low, low + 1, len(values)),)
+
+    width = _nice_width(Decimal(high - low) / target_buckets)
+    start = (low // width) * width
+    counts = [0] * ((high - start) // width + 1)
+    for value in values:
+        counts[(value - start) // width] += 1
+    return tuple(
+        PayBucket(start + index * width, start + (index + 1) * width, count)
+        for index, count in enumerate(counts)
+    )
+
+
+def _nice_width(raw: Decimal) -> int:
+    magnitude = Decimal(10) ** (len(str(int(raw))) - 1) if raw >= 1 else Decimal(1)
+    return int(next(step * magnitude for step in _NICE_STEPS if step * magnitude >= raw))
 
 
 def _median(sorted_values: list[int]) -> int:
