@@ -137,8 +137,9 @@ export type Summary = {
   headcount: number;
   joiners_this_quarter: number;
   leavers_this_quarter: number;
-  total_pay_usd: Money;
-  median_pay_usd: Money | null;
+  currency: string;
+  total_pay: Money;
+  median_pay: Money | null;
   paid_within_band_percent: string | null;
   bonus_eligible_percent: string | null;
   variable_share_percent: string | null;
@@ -155,6 +156,10 @@ export type PayGroup = {
   maximum: Money;
   variable_share_percent: string | null;
 };
+
+export type PayBucket = { lower: Money; upper: Money; count: number };
+
+export type PayDistribution = { currency: string; buckets: PayBucket[] };
 
 export type BandGroup = {
   key: string;

@@ -126,13 +126,16 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 | `GET /employees/{id}/compensation` | Full version history, newest first, each with its state (`current`, `pending`, `past`, `superseded`) and raise % in local currency. |
 | `POST /employees/{id}/compensation` | New version (raise, promotion, transfer, correction) with `effective_from` + `reason`. Returns the new history entry, `201`. |
 | `POST /employees/{id}/compensation/preview` | Dry run of the above: before → after, band position against the new role's band, raise %, USD, whether it takes effect later. Runs the same checks as a save; writes nothing (decision Q2). |
-| `GET /insights/summary` | Headcount, joiners and leavers this quarter, total and median pay (USD), % paid within band, bonus-eligibility rate, variable share, employees without a package. |
-| `GET /insights/breakdown` | `group_by=country\|department\|level` (contractors grouped separately), optional `country` / `department` / `level` filters → headcount, min/median/mean/max in USD, variable share. |
-| `GET /insights/band-distribution` | Below / in / above band counts and % in band, by group. Contractors left out. |
+| `GET /insights/summary` | Headcount, joiners and leavers this quarter, total and median pay, % paid within band, bonus-eligibility rate, variable share, employees without a package. Takes the shared insight filters and `currency` (below). |
+| `GET /insights/breakdown` | `group_by=country\|department\|level` (contractors grouped separately) → headcount, min/median/mean/max, variable share. Takes the shared insight filters and `currency`. |
+| `GET /insights/pay-distribution` | A histogram of total target pay: equal brackets with round widths (1, 2, 2.5 or 5 × a power of ten), about 12 of them. Takes the shared insight filters and `currency`. |
+| `GET /insights/band-distribution` | Below / in / above band counts and % in band, by group. Contractors left out. Takes the shared insight filters. |
 | `GET /insights/exceptions` | Counts for below band, above band, changes due in the next 60 days and missing packages (the sidebar badge is their total), plus a page of one `type`, largest gap first. |
 | `GET /insights/recent-changes` | The latest recorded changes (not hires), newest first, with raise % and whether pending. `limit` (default 5). |
 | `GET /reference/{countries,departments,roles,pay-bands}` | Dropdown data; roles include their default components. |
 | `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management (see §5a). Every other endpoint except `GET /health` requires a session. |
+
+**Insight filters:** summary, breakdown, pay-distribution and band-distribution take `country`, `department`, `level` and `employment_type`, each single-valued. `currency` is `usd` (the default: USD at reference rates) or `local`. `local` needs a `country` and reports amounts in that country's currency as stored, with no conversion. Without a country it's rejected with `422 LOCAL_CURRENCY_NEEDS_COUNTRY`.
 
 Money is returned as `{"amount_minor": 240000000, "currency": "INR"}`. Decimals (FTE, percentages, compa-ratio) are fixed-precision strings such as `"0.89"`, so clients never parse floats and SQLite and Postgres return the same text.
 

@@ -7,7 +7,7 @@ figures (E10); terminated employees are left out (E11).
 """
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from decimal import Decimal
 from enum import StrEnum
@@ -16,18 +16,21 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
 from app.domain.bands import BandPosition
-from app.domain.employment import EmploymentType
+from app.domain.employment import EmploymentStatus, EmploymentType
+from app.domain.errors import LocalCurrencyNeedsCountryError
 from app.domain.money import Money
 from app.domain.stats import (
     BandDistribution,
+    PayBucket,
     PaySummary,
     band_distribution,
+    pay_histogram,
     share_percent,
     summarise_pay,
 )
 from app.domain.versions import ChangeReason
 from app.repositories.compensation import CompensationRepository
-from app.repositories.employees import EmployeeQuery, EmployeeRepository
+from app.repositories.employees import CURRENT_EMPLOYEES, EmployeeQuery, EmployeeRepository
 from app.repositories.insights import InsightsRepository
 from app.repositories.pagination import Page, validate_page
 from app.repositories.reference import ReferenceRepository
@@ -43,6 +46,13 @@ class GroupBy(StrEnum):
     LEVEL = "level"
 
 
+class Currency(StrEnum):
+    """USD at reference rates, or the local currency of the one selected country."""
+
+    USD = "usd"
+    LOCAL = "local"
+
+
 class ExceptionType(StrEnum):
     BELOW = "below"
     ABOVE = "above"
@@ -56,8 +66,9 @@ class Summary:
     headcount: int
     joiners_this_quarter: int
     leavers_this_quarter: int
-    total_pay_usd: Money
-    median_pay_usd: Money | None
+    currency: str
+    total_pay: Money
+    median_pay: Money | None
     paid_within_band_percent: Decimal | None
     bonus_eligible_percent: Decimal | None
     variable_share_percent: Decimal | None
@@ -68,8 +79,15 @@ class Summary:
 class PayGroup:
     key: str
     label: str
+    currency: str
     summary: PaySummary
     variable_share_percent: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class PayDistribution:
+    currency: str
+    buckets: tuple[PayBucket, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,39 +139,66 @@ class InsightsService:
         self._clock = clock
         self._window = pending_window_days
 
-    def summary(self, as_of: date | None = None) -> Summary:
+    def summary(
+        self,
+        filters: EmployeeQuery | None = None,
+        currency: Currency = Currency.USD,
+        as_of: date | None = None,
+    ) -> Summary:
         day = as_of or self._clock.today()
-        people = self._current_people(EmployeeQuery(), day)
+        filters = filters or EmployeeQuery()
+        pay = self._pay(filters, currency)
+        everyone = self._directory.export(replace(filters, statuses=tuple(EmploymentStatus)), day)
+        people = [e for e in everyone if _is_current(e, day)]
         paid = [e for e in people if e.record.current is not None]
         banded = band_distribution(_banded_positions(paid))
         eligible = [e for e in paid if e.record.employment_type is not EmploymentType.CONTRACTOR]
         with_variable = [e for e in eligible if _variable_minor(e) > 0]
-        median = summarise_pay(_usd_totals(paid))
+        totals = pay.totals(paid)
+        median = summarise_pay(totals)
         quarter_start = date(day.year, 3 * ((day.month - 1) // 3) + 1, 1)
         return Summary(
             as_of=day,
             headcount=len(people),
-            joiners_this_quarter=self._insights.joiners_between(quarter_start, day),
-            leavers_this_quarter=self._insights.leavers_between(quarter_start, day),
-            total_pay_usd=Money(sum(_usd_totals(paid)), USD),
-            median_pay_usd=Money(median.median, USD) if median else None,
+            joiners_this_quarter=sum(quarter_start <= e.record.hire_date <= day for e in everyone),
+            leavers_this_quarter=sum(
+                e.record.termination_date is not None
+                and quarter_start - timedelta(days=1) <= e.record.termination_date < day
+                for e in everyone
+            ),
+            currency=pay.currency,
+            total_pay=Money(sum(totals), pay.currency),
+            median_pay=Money(median.median, pay.currency) if median else None,
             paid_within_band_percent=share_percent(banded.in_band, banded.banded),
             bonus_eligible_percent=share_percent(len(with_variable), len(eligible)),
-            variable_share_percent=_variable_share(paid),
+            variable_share_percent=pay.variable_share(paid),
             employees_without_package=len(people) - len(paid),
         )
 
     def breakdown(
-        self, group_by: GroupBy, filters: EmployeeQuery, as_of: date | None = None
+        self,
+        group_by: GroupBy,
+        filters: EmployeeQuery,
+        as_of: date | None = None,
+        currency: Currency = Currency.USD,
     ) -> list[PayGroup]:
         day = as_of or self._clock.today()
+        pay = self._pay(filters, currency)
         paid = [e for e in self._current_people(filters, day) if e.record.current is not None]
         groups = []
         for (key, label), members in _grouped(paid, _key_function(group_by)).items():
-            summary = summarise_pay(_usd_totals(members))
+            summary = summarise_pay(pay.totals(members))
             assert summary is not None
-            groups.append(PayGroup(key, label, summary, _variable_share(members)))
+            groups.append(PayGroup(key, label, pay.currency, summary, pay.variable_share(members)))
         return sorted(groups, key=lambda group: (-group.summary.median, group.label))
+
+    def pay_distribution(
+        self, filters: EmployeeQuery, currency: Currency, as_of: date | None = None
+    ) -> PayDistribution:
+        day = as_of or self._clock.today()
+        pay = self._pay(filters, currency)
+        paid = [e for e in self._current_people(filters, day) if e.record.current is not None]
+        return PayDistribution(pay.currency, pay_histogram(pay.totals(paid)))
 
     def band_distribution(
         self, group_by: GroupBy, filters: EmployeeQuery, as_of: date | None = None
@@ -224,6 +269,17 @@ class InsightsService:
             )
         return changes
 
+    def _pay(self, filters: EmployeeQuery, currency: Currency) -> "_Pay":
+        if currency is Currency.USD:
+            return _Pay(USD, local=False)
+        country = filters.country_code
+        local = self._reference.country_currency(country) if country else None
+        if local is None:
+            raise LocalCurrencyNeedsCountryError(
+                "Local currency needs exactly one country selected.", country=country
+            )
+        return _Pay(local, local=True)
+
     def _current_people(self, filters: EmployeeQuery, day: date) -> list[DirectoryEntry]:
         """Current employees who have started by `day`, matching the filters."""
         return [e for e in self._directory.export(filters, day) if e.record.hire_date <= day]
@@ -240,6 +296,28 @@ class InsightsService:
             for change in self._insights.changes_due(day, day + timedelta(days=self._window))
             if change.employee_id in by_employee
         ]
+
+
+@dataclass(frozen=True, slots=True)
+class _Pay:
+    """Reads total pay in one currency: USD at reference rates, or local amounts as stored."""
+
+    currency: str
+    local: bool
+
+    def totals(self, entries: Iterable[DirectoryEntry]) -> list[int]:
+        if not self.local:
+            return _usd_totals(entries)
+        return [e.record.current.ttc_minor for e in entries if e.record.current is not None]
+
+    def variable_share(self, entries: list[DirectoryEntry]) -> Decimal | None:
+        if not self.local:
+            return _variable_share(entries)
+        return share_percent(sum(_variable_minor(e) for e in entries), sum(self.totals(entries)))
+
+
+def _is_current(entry: DirectoryEntry, day: date) -> bool:
+    return entry.record.status in CURRENT_EMPLOYEES and entry.record.hire_date <= day
 
 
 def _key_function(group_by: GroupBy) -> Callable[[DirectoryEntry], tuple[str, str]]:

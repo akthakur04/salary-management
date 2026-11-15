@@ -15,7 +15,7 @@ Built in Claude Design from [PRODUCT_DESIGN.md](PRODUCT_DESIGN.md) (persona, Sag
 | 4 | **Employee profile** | Understand | Full package breakdown (base, allowances shown monthly → annual, bonus as % of base), "How is this calculated?", one-time payment shown separately and excluded from total (E-rules), band gauge with compa-ratio, effective-dated history. |
 | 5 | **Revise compensation** | Act → Confirm | **Interactive.** Promotion toggle applies L4 defaults (E3/E17), quick picks (+12%, band min, midpoint), live preview of before → after, % change, total pay and band position; a warning when still below band; bonus validation (E21); review → confirm → success with *pending until effective date* (E14). |
 | 6 | **Exceptions** | Review | **Interactive tabs:** below band, above band (framed as informational), pending changes, missing package (E13). |
-| 7 | **Insights** | Answer | **Interactive group-by** (country / department / level): range bars (min → max with median), fixed vs. variable mix, distribution against bands. |
+| 7 | **Insights** | Answer | **Interactive group-by** (country / department / level): range bars (min → max with median), fixed vs. variable mix, distribution against bands. The built page adds a drill-down (see below). |
 | — | **Foundations** | — | Archetype, colour and status tokens, type scale, voice do/don't, principles. |
 
 ## Design decisions worth noting
@@ -41,3 +41,5 @@ Screens map 1:1 to Next.js routes (`/login`, `/`, `/employees`, `/employees/[id]
 | Exceptions | Six illustrative rows per tab | All rows, 25 per page, largest gap first; due-soon changes sorted by date | Real data. |
 | Revise | Reason list without "transfer" | Same; transfers aren't offered from this form | A transfer also needs a country and restated allowances, which this form doesn't collect. The API supports it. |
 | Header | "Figures as of 12 Nov 2026" | Today's date from the API | Live data. |
+| Insights, filters | Group-by only, company-wide, USD | A filter bar (country, department, level, employment type, single-select, in the URL); KPI cards for the selection; a pay-distribution histogram; every panel grouped by a dimension that's still open; a link to the same people in the directory | Requested after Phase 6: the HR Manager wanted to pick one country, such as India, and see its pattern. |
+| Insights, currency | USD at reference rates | With one country selected, amounts are in its own currency by default, with a USD toggle; the header drops its "USD at reference rates" note on this page | Comparing Indian salaries in dollars hides the lakh figures HR actually works with. Across countries, USD stays the only fair comparison. |

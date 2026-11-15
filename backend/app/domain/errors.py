@@ -79,3 +79,7 @@ class InvalidEmployeeIdentityError(DomainError):
 
 class DuplicateEmployeeError(DomainError):
     code = "DUPLICATE_EMPLOYEE"
+
+
+class LocalCurrencyNeedsCountryError(DomainError):
+    code = "LOCAL_CURRENCY_NEEDS_COUNTRY"

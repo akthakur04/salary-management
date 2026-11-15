@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatChange,
+  formatCompactMoney,
   formatCompactUsd,
   formatDate,
   formatMoney,
@@ -72,5 +73,23 @@ describe("minor and major units", () => {
   it("converts whole local amounts to minor units and back", () => {
     expect(majorToMinor(2_688_000)).toBe(268_800_000);
     expect(minorToMajor(268_800_000)).toBe(2_688_000);
+  });
+});
+
+describe("formatCompactMoney", () => {
+  it("shortens rupees to lakh and crore", () => {
+    expect(formatCompactMoney({ amount_minor: 8_14_74_000_00, currency: "INR" })).toBe("₹8.1 Cr");
+    expect(formatCompactMoney({ amount_minor: 28_00_000_00, currency: "INR" })).toBe("₹28.0 L");
+    expect(formatCompactMoney({ amount_minor: 45_000_00, currency: "INR" })).toBe("₹45,000");
+  });
+
+  it("shortens other currencies to thousands and millions", () => {
+    expect(formatCompactMoney({ amount_minor: 812_400_000_00, currency: "USD" })).toBe("$812.4M");
+    expect(formatCompactMoney({ amount_minor: 71_300_00, currency: "EUR" })).toBe("€71.3K");
+  });
+
+  it("can drop the decimal for axis labels", () => {
+    expect(formatCompactMoney({ amount_minor: 40_000_00, currency: "USD" }, 0)).toBe("$40K");
+    expect(formatCompactMoney({ amount_minor: 25_00_000_00, currency: "INR" }, 0)).toBe("₹25 L");
   });
 });

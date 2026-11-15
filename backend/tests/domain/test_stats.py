@@ -3,8 +3,10 @@ from decimal import Decimal
 from app.domain.bands import BandPosition
 from app.domain.stats import (
     BandDistribution,
+    PayBucket,
     PaySummary,
     band_distribution,
+    pay_histogram,
     share_percent,
     summarise_pay,
 )
@@ -70,3 +72,36 @@ def test_share_is_a_percentage_to_one_decimal_rounded_half_to_even() -> None:
 
 def test_share_of_nothing_is_none() -> None:
     assert share_percent(0, 0) is None
+
+
+def test_pay_histogram_uses_round_bucket_widths() -> None:
+    buckets = pay_histogram([12_000_00, 48_000_00, 95_000_00], target_buckets=10)
+
+    assert {bucket.upper - bucket.lower for bucket in buckets} == {10_000_00}
+    assert (buckets[0].lower, buckets[-1].upper) == (10_000_00, 100_000_00)
+    assert [bucket.count for bucket in buckets] == [1, 0, 0, 1, 0, 0, 0, 0, 1]
+
+
+def test_pay_histogram_puts_the_highest_amount_in_the_last_bucket() -> None:
+    buckets = pay_histogram([0, 100, 200], target_buckets=2)
+
+    assert [(b.lower, b.upper, b.count) for b in buckets] == [
+        (0, 100, 1),
+        (100, 200, 1),
+        (200, 300, 1),
+    ]
+
+
+def test_pay_histogram_skips_people_without_a_package() -> None:
+    buckets = pay_histogram([50_000_00, None, 70_000_00], target_buckets=4)
+
+    assert sum(bucket.count for bucket in buckets) == 2
+
+
+def test_pay_histogram_of_one_amount_is_a_single_bucket() -> None:
+    assert pay_histogram([42_000_00, 42_000_00]) == (PayBucket(42_000_00, 42_000_01, 2),)
+
+
+def test_pay_histogram_of_nobody_is_empty() -> None:
+    assert pay_histogram([]) == ()
+    assert pay_histogram([None]) == ()

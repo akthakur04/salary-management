@@ -116,8 +116,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {summary.data ? (
             <span className="ml-auto text-[13px] text-muted-foreground">
               Figures as of{" "}
-              <b className="font-semibold text-foreground">{formatDate(summary.data.as_of)}</b> ·
-              USD at reference rates
+              <b className="font-semibold text-foreground">{formatDate(summary.data.as_of)}</b>
+              {/* Insights can switch to a local currency and says which in its own heading. */}
+              {pathname.startsWith("/insights") ? null : " · USD at reference rates"}
             </span>
           ) : null}
         </header>

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_clock, get_db_session, get_settings_from_app
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.domain.employment import EmploymentType
 from app.repositories.employees import EmployeeQuery
 from app.repositories.pagination import MAX_PAGE_SIZE
 from app.schemas.insights import (
@@ -16,11 +17,12 @@ from app.schemas.insights import (
     ExceptionCountsOut,
     ExceptionItemOut,
     ExceptionsOut,
+    PayDistributionOut,
     PayGroupOut,
     RecentChangeOut,
     SummaryOut,
 )
-from app.services.insights import ExceptionType, GroupBy, InsightsService
+from app.services.insights import Currency, ExceptionType, GroupBy, InsightsService
 
 router = APIRouter(prefix="/insights", tags=["insights"])
 
@@ -42,23 +44,47 @@ def group_filters(
     country: Annotated[str | None, Query(min_length=2, max_length=2)] = None,
     department: Annotated[int | None, Query()] = None,
     level: Annotated[int | None, Query(ge=1, le=5)] = None,
+    employment_type: Annotated[EmploymentType | None, Query()] = None,
 ) -> EmployeeQuery:
-    return EmployeeQuery(country_code=country, department_id=department, level=level)
+    return EmployeeQuery(
+        country_code=country,
+        department_id=department,
+        level=level,
+        employment_types=(employment_type,) if employment_type else (),
+    )
 
 
 Filters = Annotated[EmployeeQuery, Depends(group_filters)]
+PayCurrency = Annotated[
+    Currency,
+    Query(description="`local` needs a country filter; amounts are then in its currency."),
+]
 
 
 @router.get("/summary")
-def summary(service: Service, as_of: AsOf = None) -> SummaryOut:
-    return SummaryOut.of(service.summary(as_of))
+def summary(
+    service: Service, filters: Filters, currency: PayCurrency = Currency.USD, as_of: AsOf = None
+) -> SummaryOut:
+    return SummaryOut.of(service.summary(filters, currency, as_of))
 
 
 @router.get("/breakdown")
 def breakdown(
-    service: Service, filters: Filters, group_by: GroupBy = GroupBy.COUNTRY, as_of: AsOf = None
+    service: Service,
+    filters: Filters,
+    group_by: GroupBy = GroupBy.COUNTRY,
+    currency: PayCurrency = Currency.USD,
+    as_of: AsOf = None,
 ) -> list[PayGroupOut]:
-    return [PayGroupOut.of(group) for group in service.breakdown(group_by, filters, as_of)]
+    groups = service.breakdown(group_by, filters, as_of, currency)
+    return [PayGroupOut.of(group) for group in groups]
+
+
+@router.get("/pay-distribution")
+def pay_distribution(
+    service: Service, filters: Filters, currency: PayCurrency = Currency.USD, as_of: AsOf = None
+) -> PayDistributionOut:
+    return PayDistributionOut.of(service.pay_distribution(filters, currency, as_of))
 
 
 @router.get("/band-distribution")
