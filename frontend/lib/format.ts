@@ -54,6 +54,26 @@ export function formatCompactUsd(amountMinor: number): string {
   return `$${formatted}`;
 }
 
+/**
+ * A short amount for headline figures and chart axes: lakh and crore for rupees
+ * (₹28.0 L, ₹8.1 Cr), thousands and millions otherwise ($71.3K).
+ */
+export function formatCompactMoney(money: Money, fractionDigits = 1): string {
+  const major = minorToMajor(money.amount_minor);
+  const symbol = currencySymbol(money.currency);
+  if (money.currency === "INR") {
+    const [divisor, unit] = Math.abs(major) >= 1e7 ? [1e7, "Cr"] : Math.abs(major) >= 1e5 ? [1e5, "L"] : [0, ""];
+    if (!divisor) return formatMoney(money);
+    return `${symbol}${(major / divisor).toFixed(fractionDigits)} ${unit}`;
+  }
+  const formatted = new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  }).format(major);
+  return `${symbol}${formatted}`;
+}
+
 /** A signed change such as "+12.0%" or "−1.2%". The API sends one-decimal strings. */
 export function formatChange(percent: string | null): string {
   if (percent === null) return "—";
