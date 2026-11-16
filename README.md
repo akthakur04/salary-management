@@ -25,7 +25,7 @@ Salary management for an HR Manager looking after 10,000 employees across 8 coun
 ## Architecture in brief
 
 ```
-Browser ──▶ Next.js 15 (Vercel) ──/api/*──▶ FastAPI (Render, Docker) ──▶ Postgres (Render)
+Browser ──▶ Next.js 15  ──/api/*──▶ FastAPI ( Docker) ──▶ Postgres 
 ```
 
 - **Backend:** Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 and Alembic. It's layered api → services → domain and repositories. All salary rules live in a pure, fully tested domain layer.
