@@ -2,10 +2,6 @@
 
 Salary management for an HR Manager looking after 10,000 employees across 8 countries. It covers full salary packages (base, allowances, bonus, commission and one-time payments), effective-dated history, pay bands, and insights into how the organisation pays people.
 
-| | |
-|---|---|
-| **Live app** | _Not deployed yet. The URL goes here after the first deploy ([DEPLOYMENT.md](docs/DEPLOYMENT.md))._ |
-| **API health** | _Same: `https://<api>.onrender.com/api/v1/health`_ |
 
 ## What it does
 
