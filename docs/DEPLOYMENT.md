@@ -88,7 +88,7 @@ Pushing to `main` redeploys both: Render rebuilds the API when anything under `b
 
 To run the whole app on Postgres, as in production, without installing Python or Node:
 
-1. Create `backend/.env` with the HR login, as in [SETUP_GUIDE.md §4](SETUP_GUIDE.md#4-backend-configure-the-login). Its `DATABASE_URL` is ignored; Compose points the API at its own Postgres.
+1. Create `backend/.env` with the HR login, as in [SETUP_GUIDE.md, steps A3 and A5](SETUP_GUIDE.md#a3-create-the-settings-file). Its `DATABASE_URL` is ignored; Compose points the API at its own Postgres.
 2. From the repository root:
 
    ```bash
