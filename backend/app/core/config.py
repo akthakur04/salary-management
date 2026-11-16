@@ -3,10 +3,15 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_SESSION_SECRET_LENGTH = 32
+
+# Hosts such as Render hand out postgres:// or postgresql:// URLs, which SQLAlchemy
+# would open with psycopg2. The app ships psycopg (version 3), so name it.
+_HOSTED_POSTGRES_SCHEMES = ("postgres://", "postgresql://")
+_PSYCOPG_SCHEME = "postgresql+psycopg://"
 
 
 class Settings(BaseSettings):
@@ -24,6 +29,14 @@ class Settings(BaseSettings):
 
     # Pending changes due within this many days count as exceptions (Overview, sidebar badge).
     pending_window_days: int = 60
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_psycopg_for_postgres(cls, url: str) -> str:
+        for scheme in _HOSTED_POSTGRES_SCHEMES:
+            if url.startswith(scheme):
+                return _PSYCOPG_SCHEME + url.removeprefix(scheme)
+        return url
 
 
 def ensure_auth_configured(settings: Settings) -> None:
