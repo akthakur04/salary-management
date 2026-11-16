@@ -6,7 +6,6 @@ Salary management for an HR Manager looking after 10,000 employees across 8 coun
 |---|---|
 | **Live app** | _Not deployed yet. The URL goes here after the first deploy ([DEPLOYMENT.md](docs/DEPLOYMENT.md))._ |
 | **API health** | _Same: `https://<api>.onrender.com/api/v1/health`_ |
-| **Demo video** | _To be recorded from [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)_ |
 
 ## What it does
 
