@@ -58,3 +58,322 @@ Before writing code, the AI read all the docs and screen sources and raised nine
 - `ruff check .`, `ruff format --check .` and `mypy` (strict) all pass.
 - `pytest`: 13 tests pass in under 0.1 s.
 - The real server was started with `uvicorn app.main:create_app --factory`. `/api/v1/health` returned `{"status":"ok","database":"ok"}`, an unknown route returned the standard error shape, and `/docs` loaded.
+
+## Phase 2: Domain, test-first
+
+- **Prompt:** "go, do and raise a separate PR for it", for Phase 2 of the master prompt.
+- **Output:** the pure-Python domain in `backend/app/domain/`:
+  - `Money` and the domain errors
+  - pay components
+  - package totals
+  - role defaults
+  - employment rules and pay-band comparison
+  - FX conversion
+  - effective-dated version rules
+  - pay summaries and band distribution
+  - employee identity
+  - a test that keeps the domain free of framework imports
+  - a traceability table in `COMPENSATION_MODEL.md` §5
+- **Test-first:** each module was committed as a failing `test:` commit, then a `feat:` commit that makes it pass.
+
+### Decisions the AI made, for review
+
+These follow from the docs or from the kick-off answers, but the docs didn't spell them out:
+
+| Decision | Reasoning |
+|---|---|
+| Role defaults are bonus or commission **percentages** only | A role spans every country and currency, so a fixed default amount (₹ vs $) would be meaningless. Allowances are set per employee. |
+| A 0% bonus or commission is rejected | E20 rejects zero components. HR removes the component instead. |
+| The first version must be a `hire`, and `hire` is only allowed first | Keeps history meaningful, and matches the seed and the hire service. |
+| A new change must start after the latest version, even when that version is future-dated | This follows from Q5 and E16. Allowing it would create an overlap with the pending change. |
+| A same-date correction supersedes the latest version, which stays in history with a zero-length period | Q5 allowed a correction "on" the latest start date. The zero-length period keeps the record while it never counts as in force. |
+| Compa-ratio is rounded to two decimals; raise % and variable share to one | Matches the design (0.89, +9.1%). |
+| USD always has rate 1 | USD per USD is 1 by definition, so the rate set doesn't need it. |
+
+**Candidate's decision on review:** the AI asked whether moves to another country (E18) should get their own reason, rather than borrowing `market_adjustment`. The candidate chose to **add `transfer`**, so the reasons are hire, promotion, merit, market adjustment, transfer and correction.
+
+### Corrections during the phase
+
+- **Ruff import order:** the pre-commit ruff hook, run from the repo root, sorted `app` imports as third-party, the opposite of ruff run from `backend/`. The fix pins `app` and `tests` as first-party. The hook also caught two compound `assert`s and a `zip` that should be `pairwise`.
+- **Traceability checker:** the AI's first script reported every test as missing. It had added `-q` on top of the configured `-q`, so pytest printed per-file counts instead of test IDs. The AI fixed the script before trusting the result.
+
+### How the output was verified
+
+- Domain suite: 154 tests in 0.20 s, with **100% line and branch coverage** of `app/domain`. CI now fails if domain coverage drops below 100%.
+- Every edge case E1–E25 maps to at least one test. A script checked that all 44 test names in the traceability table exist.
+- Ravi Kumar's numbers from the profile design reproduce exactly: fixed cash ₹27,86,400, total pay ₹30,26,400, compa-ratio 0.89, and USD 36,316.80 at 0.012.
+- ruff, the format check and mypy (strict) pass.
+
+## Phase 3: Persistence
+
+- **Prompt:** "start phase 3 and raise a separate PR".
+- **Output:**
+  - ORM models and constraints
+  - an exact-decimal column type
+  - the first Alembic migration, with a test that the migrated schema matches the models
+  - repositories for reference data, compensation history and the employee directory
+  - hire, revise and terminate services, each in one transaction
+  - a directory service that adds the domain's band comparison and USD figures
+- **Test-first:** repositories, services and the directory were each committed as failing `test:` commits before the `feat:` commits.
+
+### Decisions the candidate made at the start of the phase
+
+The AI raised two questions before writing any code:
+
+| Question | Candidate's decision |
+|---|---|
+| Should the employee row keep its own role and country, now that each version stores them? Keeping them would leave a future-dated promotion stale until something updated them. | **Read them from the version in force.** The columns were dropped from `employee`, and the directory joins the version in force on `as_of`. |
+| What should happen when an employee with a saved future change is terminated before that change takes effect? | **Reject with `409 PENDING_CHANGE_AFTER_TERMINATION`.** Revising a terminated employee is rejected too. |
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| FX rates, FTE and percentages use an `ExactDecimal` type: NUMERIC on Postgres, text on SQLite | SQLite would round them through floating point. The migration test confirms the schema still matches the models. |
+| A revision without components carries over the recurring components only | A one-time payment belongs to the version it was recorded in; copying it forward would count it twice in its payout year. |
+| Carried-over fixed amounts keep their original currency | A transfer must restate allowances in the new currency. Otherwise ₹30,000 would silently become €30,000. |
+| Before their start date, a future hire shows the role and country of their first version, with no current package | They still appear in the directory with the right role and country. |
+| ~~Termination dates must fall between the hire date and today~~ | Replaced on review (see below). |
+| Directory band filter in SQL, display values from the domain | SQL is needed to filter and count. A parametrised test checks the SQL position matches the domain comparison for every position. |
+
+### Candidate's decision on review: future termination dates
+
+The AI pointed out that three rules together made some employees impossible to terminate: "reject a termination with a pending change after it", "no future termination dates" and "versions can't be withdrawn". Anyone with a pending raise could only be terminated after the raise took effect. The candidate chose to **allow future termination dates**:
+
+- Terminating records the last day worked and nothing else.
+- Status is worked out from that date at read time (`status_on` in the domain, and the same rule in the directory query). The employee counts as terminated from the day after, with no job needed to flip the status.
+- HR can date a termination on or after a pending change.
+- A pay change dated after the last day is rejected with `CHANGE_AFTER_TERMINATION`.
+- `EmployeeService` no longer needed its clock, so the AI removed that dependency.
+
+### Corrections during the phase
+
+- **Migration types:** Alembic rendered the custom decimal type as `app.models.types.ExactDecimal()`, with no import and no precision. The AI fixed it by hand and confirmed the schema comparison can detect drift by adding a column in memory.
+- **Wrong test expectations:** the AI's first directory test had two wrong expected values. Every employee code started with `EMP-0`, so that filter matched everyone, and Ravi has no bonus at that point. Both were caught by checking the expected numbers by hand before implementing.
+- **A test-only method:** the AI first planned a repository method used only by a test, then dropped it and had the test read the stored columns directly.
+- **A misleading message:** the first termination error suggested "contact support to withdraw the change", which isn't a feature. The message was rewritten.
+
+### How the output was verified
+
+- 244 backend tests pass in about 2 s.
+- Coverage is 99% overall, with the revise service and the directory at 100%. The one uncovered line is the Postgres branch of the decimal type, which can't run on SQLite.
+- Migrations upgrade to a schema identical to the models and downgrade to an empty database.
+- ruff, the format check, mypy (strict, now including the migrations) and all pre-commit hooks pass.
+
+## Phase 4: Seed
+
+- **Prompt:** "Start Phase 4". It was the first phase branched from `dev` after PR #5 merged, so its PR targets `dev`.
+- **Output:**
+  - reference data: 8 countries, 8 departments, 25 families × 5 levels, a band for every role in every country, and role defaults
+  - a deterministic generator for 10,000 employees with salary histories
+  - regional synthetic names
+  - an idempotent bulk loader
+  - the `python -m app.seed` command
+- **Test-first:** the generator's invariants (on a 2,000-person sample) and the loader's behaviour were each committed as failing tests before the implementation.
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| Place current pay against the band first, then build history backwards | It's the only way to control the "~85% in band" mix while keeping realistic merits and promotions. Every version still goes through `plan_revision`, so the seed can't create data the app would reject. |
+| Pin the SE L3 and SE L4 India bands, and seed Ravi Kumar exactly as designed | The demo scenario (a 12% promotion raise that still lands below the L4 minimum) depends on those exact figures. |
+| The United Kingdom uses ISO code `GB` | It's the ISO 3166 code. The brief and master prompt say "UK", and it displays as "United Kingdom". |
+| Missing packages (12) and future hires (20) at fixed positions, not random draws | Every sample size then gets a predictable number, so tests don't depend on luck. |
+| Loader ids come back via `RETURNING`, never written explicitly | Explicit ids would leave Postgres sequences behind, and the app's next insert would collide with seeded rows. |
+| A database that already has data is left alone unless `--reset` is given | Re-running the seed against the deployed demo shouldn't wipe changes made during the demo. |
+
+### Corrections during the phase
+
+- **A zero sign-on bonus at full scale:** the full 10,000-person run failed, though the 2,000-person sample passed. A 5% sign-on rounded to the nearest thousand came to 0 for small part-time bases in GBP or SGD, and the domain correctly rejected it. The fix rounds to the nearest hundred, and a test now generates the full set.
+- **Too few versions:** the first full run produced 21,486 versions against the ~30k the requirements plan for. The AI weighted histories towards three or four versions; recent hires cap it at ~26,800.
+- **Slow loading (13.6 s):** the load fit the 15 s budget, but only just. Profiling showed SQLAlchemy's ORM bulk insert with `RETURNING` issuing one statement per row (32k statements), while SQLite itself took 0.75 s. Batched Core inserts brought it to 1.5 s.
+- **Name lists:** reformatting them into comma-separated strings first split two-word names ("Wei Ling") and left empty entries. A check on the list lengths caught it before commit.
+
+### How the output was verified
+
+- 271 backend tests pass in about 4 s. Coverage is 99% overall; the generator, names and reference data are at 100%.
+- The generator tests check, on a 2,000-person sample:
+  - the same seed gives the same output
+  - unique codes and emails
+  - 8 departments, 125 roles and 1,000 bands
+  - a valid history of 1–4 versions for each person, in the right currency
+  - the employment mix, about 5% terminated with nothing due after the last day, and about 85% in band
+  - about 20% overrides, plus pending changes and missing packages
+  - Ravi's exact figures
+
+  A separate test generates the full 10,000.
+- The loader tests check that the data loads completely, that a second run changes nothing, that `--reset` reloads identical data, that the first 50 histories read back exactly as generated, and that the directory shows Ravi at compa-ratio 0.89 and $36,316.80.
+- The real command was run against a migrated SQLite file several times: 10,000 employees, 26,776 versions and 32,249 components in about 1.5 s per load.
+
+## Phase 5: API and authentication
+
+- **Prompt:** "Merged, start Phase 5". The work branched from `dev`, and its PR targets `dev`.
+- **Output:**
+  - **Auth:** bcrypt check, HS256 JWT in an HttpOnly / Secure / SameSite=Lax cookie, one `require_session` dependency, a start-up check of the login settings, and `python -m app.core.hash_password`.
+  - **Errors:** domain errors mapped to 409 or 422.
+  - **Endpoints:** reference data; employees (list, CSV export, profile, history, hire, edit, terminate, revise, preview); insights (summary, breakdown, band distribution, exceptions, recent changes).
+  - **Performance:** a timing script and `PERFORMANCE.md`.
+- **Test-first:** auth, error mapping, reference, employee and insight endpoints were each committed as failing tests before the implementation.
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| Login failures return `INVALID_CREDENTIALS` (401) with the design's copy; a missing, expired or tampered session returns `UNAUTHENTICATED` | Both are 401. The distinct code lets the UI show the login error in place, instead of redirecting to the login page it's already on. A wrong email and a wrong password get identical responses, and bcrypt always runs. |
+| `GET /health` is public | The hosting platform's health check can't send a cookie, and health exposes no salary data. This was noted in Phase 1 and is now in ARCHITECTURE §5a. |
+| The app refuses to start without a complete login configuration | A misconfigured deploy fails at start-up instead of at the first login attempt. |
+| Decimals are fixed-precision strings (`"0.89"`, `"15.00"`) | SQLite read back `15` and Postgres `15.00`. Fixed formatting makes the API identical on both, and clients never parse floats. |
+| `recent-changes` takes `limit`, not `days` | Seeded versions all share one `created_at`, so a "last 7 days" window would return either nothing or everything. The endpoint lists the latest recorded changes (newest first), which is what the Overview panel shows. |
+| Peers are current full- and part-time employees in the same role and country, compared on FTE-equivalent base; contractors are left out | It matches how bands are compared. |
+| CSV text starting with `=`, `+`, `-` or `@` is prefixed with `'` | HR opens the export in Excel, and a crafted name shouldn't run as a formula. |
+| Insights compute from all current employees in Python, reusing the tested directory query | It's one source of truth for band position and USD, and fast enough at 10k (see below). Pushing aggregates into SQL is documented as the next step. |
+
+### Corrections during the phase
+
+- **The route-table walk found nothing:** the first route-table test listed zero routes. FastAPI 0.162 mounts included routers lazily, so `app.routes` no longer lists endpoints. Rather than depend on private internals, the test walks the OpenAPI schema (a public, complete list of paths and methods) and sends every protected route a cookie-less request. The AI checked that the test fails by adding an unprotected route in memory.
+- **Over budget:** the first timing put the insight endpoints at about 290 ms p95, two over the 300 ms budget. Profiling found ORM objects built for 10,000 read-only rows (~65 ms extra) and an FX table per row (~45 ms). Plain columns and one rate set per request brought them to about 240 ms. The SQL itself was already fully indexed (`EXPLAIN QUERY PLAN`).
+- **Code left unfinished:** the AI's first insights service had a placeholder method that raised `NotImplementedError`, plus an unused parameter. The router used an `__import__` hack, and two percentages used float `round()`. All four were fixed before commit, and a shared `share_percent` was added to the domain, with tests, so every percentage rounds half-to-even.
+- **Methods named `list`:** they hid Python's built-in `list` in later type annotations. They were renamed to `search`.
+- **A real bug found by chasing coverage:** `update_details` set the new email on the session object before validating the FTE. A rejected edit left the change pending, and the next commit on that session saved it. A failing test showed it, and the fix validates everything before changing the row. The other write paths were checked, and they change rows only inside their transaction.
+
+### How the output was verified
+
+- 361 backend tests pass. Coverage is 99% overall. The domain stays at 100% coverage. ruff, the format check, mypy (strict, now also on `scripts/`) and all hooks pass.
+- Auth tests cover the cookie attributes, case-insensitive email, a wrong password matching an unknown email, missing / expired / tampered / wrongly-signed sessions, logout, and refusing to start without settings. The route-table test covers all 20 protected routes.
+- The preview test reproduces the demo scenario: promoting Ravi to L4 at ₹26,88,000 shows total pay ₹34,77,600, +12.0%, **below band by ₹1,12,000**, and saves nothing.
+- Timings against the full seed are in `docs/PERFORMANCE.md`. Every budgeted endpoint is within 300 ms p95: directory and profile at 2–22 ms, insights at about 230–260 ms.
+- **Smoke test:** a real `uvicorn` server with a `.env` holding a freshly generated hash. A request without a cookie and a wrong password each got 401, login set the expected cookie, and the summary and directory returned the seeded figures (Ravi at compa-ratio 0.89).
+
+## Phase 6: Frontend
+
+- **Prompt:** "Merged, start Phase 6". The work branched from `dev`, and its PR targets `dev`.
+- **Output:**
+  - A Next.js 15 app with shadcn/ui (Radix, Nova preset), the PRODUCT_DESIGN tokens as CSS variables (light only), Geist with tabular figures for amounts, and the `/api` proxy with the login-redirect middleware.
+  - A typed API client and TanStack Query hooks.
+  - The seven screens in journey order: Sign in, Overview, Employees, Profile, Revise, Exceptions, Insights.
+  - The hire form (decision Q6), ⌘K employee search, and the frontend CI job.
+- **Test-first:**
+  - formatting, band status, URL filters and form rules were committed as failing tests before the code
+  - so was the revise page's pure logic: the request body, quick picks and confirmation sentence
+  - the login component tests followed the page
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| The revise preview calls the server's dry-run endpoint (debounced 300 ms) | ARCHITECTURE §7 says the UI must not duplicate business logic. The preview is the server's calculation, so it can't drift from what's saved. |
+| Signed-in pages are client components | The session cookie is HttpOnly and only the browser sends it. Server-rendering data would mean forwarding cookies through Next.js. |
+| Keyboard and screen-reader support | Status chips always carry an icon and words. Charts have hidden data tables. The ⌘K search, tabs and sort headers are real buttons with names and states (`aria-pressed`, `aria-sort`, `aria-selected`). |
+| Packages needed by the chosen stack | `@hookform/resolvers` (upgraded to v5 for typed Zod transforms), shadcn's own dependencies (Radix, `cmdk`, `lucide-react`, `class-variance-authority`, `cn`, `sonner`, `tw-animate-css`), and `jsdom` with the Vite React plugin for Vitest. |
+| Small, deliberate departures from the canvas | Recorded in UI_DESIGN.md "Where the built app differs from the canvas". For example, the login page states scope figures because it can't load live counts before sign-in. |
+
+### Corrections during the phase
+
+These were caught by running the app in the preview browser rather than trusting the type checker:
+
+- **Serif text:** the type rendered in a serif font. The font variables were on `<body>` while the font family was applied on `<html>`.
+- **⌘K crash:** the palette crashed on open, because this shadcn version's `CommandDialog` expects the caller to add the `<Command>` root. Once fixed, Enter still did nothing: with server-side filtering, cmdk never highlighted results that arrived late. The selection is now controlled.
+- **Unnamed controls:** the promotion checkbox and the header search button had no accessible names.
+- **Future hires:** a future hire's profile offered "Record a package", even though their first package was already saved as pending.
+- **Mixed build output:** running `next build` beside the dev server corrupted the dev server's `.next` output, and the build was rerun cleanly. CI builds in its own checkout.
+- **Reported by the candidate after the PR:** autofilling the login crashed the page with "Cannot read properties of undefined (reading 'toLowerCase')". Browser autofill and password managers send `keydown` events with no `key`, and the ⌘K listener assumed one. A regression test reproduced it before the fix.
+
+Two generated-code issues were checked rather than assumed:
+
+- **A package named `cn`:** shadcn imported it, which looked like a stray third-party dependency. It turned out to be shadcn's own package (maintainer and repository checked), so it was kept.
+- **Dark mode:** the generated components came with 55 `dark:` classes and `next-themes`. All were removed, because the product is light only.
+
+### How the output was verified
+
+- **Checks:** `npm run lint`, `npm run typecheck`, 48 Vitest + Testing Library tests, and `next build` all pass. They cover money formatting, band-status rendering, filter ↔ URL wiring, form validation rules and the login form, the revise request body, quick picks and the confirmation sentence.
+- **Browser walk-through,** against the full seed with a local test login:
+  - The redirect to `/login` worked, as did validation messages and the server's generic error for a wrong password.
+  - The Overview KPIs and panels loaded.
+  - The directory filters were applied from the URL. Sorting set `aria-sort` and the URL. The CSV download held the same 63 filtered rows.
+  - Ravi's profile showed ₹30,26,400, a compa-ratio of 0.89 and a four-step history.
+- **The Revise demo:** with the defaults (promote to L4, +12%, bonus 15%), the server preview showed ₹26,88,000, total pay ₹34,77,600, a compa-ratio of 0.81 and the amber "₹1,12,000 short of the minimum" warning. A 150% bonus was rejected inline. After review → confirm, the change was saved as pending for 1 Jan 2027, and the Exceptions badge went from 1,488 to 1,489.
+- **The rest of the journey:** the Exceptions tabs and the Insights grouping work. Hiring a new employee led to their profile, and Sign out ended the session (the API then answered 401). No console errors appeared on any screen in a fresh tab.
+
+## After Phase 6: Insights drill-down
+
+**Request (from the candidate, on seeing the Insights page):** let the HR Manager pick one country, such as India, and see how many people are there and how they're paid, "or something more granular".
+
+The AI asked four questions before building. The candidate chose:
+
+- filters for country, department, level and employment type, single-select and kept in the URL
+- local currency when one country is selected, with a USD toggle
+- all three extras: KPI cards for the selection, a link to those employees, and a pay-distribution chart
+- a separate pull request once Phase 6 had merged
+
+**Work, test-first:**
+
+- `pay_histogram` in the domain: equal brackets with round widths, failing tests first
+- API tests for filtered summaries, local currency, the 422 without a country, employment type, joiners and leavers within a selection, and the new `/insights/pay-distribution`
+- frontend tests for the URL helpers, the group options left after filtering, and compact lakh / crore amounts
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| The summary's `total_pay_usd` and `median_pay_usd` were renamed to `total_pay` and `median_pay`, with a `currency` field | They can now be in a local currency, so a `_usd` name would lie. The Overview was updated in the same commit. This changes an existing response shape; the only client is this frontend. |
+| Local currency is reported as stored, with no conversion | Every person in one country is paid in its currency (E-rules on currency per country), so local totals need no FX at all. `local` without a country is an error rather than silently falling back to USD. |
+| Joiners and leavers come from the directory query | The old counts ignored filters. Reading them from the same query keeps every KPI on the same people; the unused repository counts were removed. |
+| A grouping already narrowed to one value is left out of the group-by switcher | Grouping India by country shows one row. When every grouping is narrowed, the page says so instead of drawing empty charts. |
+| The mix and band panels follow the chosen grouping | Before, they were fixed to department. A drill-down into one department would otherwise show one bar. |
+| `FilterSelect` moved to `components/` | Both filter bars use it now. |
+
+### Corrections during the work
+
+Found in the preview browser, not by the tests:
+
+- **The directory link's count didn't match.** "View these 822 employees" opened a directory showing 823. The extra person was a test hire starting on 1 Dec: the directory lists future starters, while insights count only people who have started. The link now reads "See these employees in the directory", with no count.
+- **The header contradicted the page.** It said "USD at reference rates" above figures in rupees. On Insights the header now leaves the currency to the page heading.
+- **"1 people"** in the histogram tooltip and its screen-reader table.
+
+### How the output was verified
+
+- **Checks:** backend ruff, mypy (strict) and pytest pass, with domain coverage at 100%. Frontend lint, typecheck and 62 Vitest tests pass.
+- **Browser, against the full seed:**
+  - India: 2,634 people, a median of ₹22,59,150 (shown as $27,110 in USD), and ₹10 L histogram brackets.
+  - Germany, Engineering, L3 in EUR: "Nothing left to compare" appears where the groupings would be.
+  - Contractors only: no band figures, with "—" for paid within band.
+  - The directory link and CSV export carry the same filters, and the Overview still loads with no console errors.
+- **Timing:** filtered insight endpoints run under 100 ms p95. The company-wide summary rose from 239 to 288 ms p95, still within the 300 ms budget ([PERFORMANCE.md](PERFORMANCE.md)).
+
+## Phase 7: Deploy and polish
+
+- **Prompt:** "Start Phase 7". The work branched from `dev` after PR #9 merged, and its PR targets `dev`.
+- **Questions asked first, with the answers:**
+  - **Add the `psycopg[binary]` dependency?** Yes. The backend had no Postgres driver, so it couldn't have connected to Render Postgres.
+  - **Add a `docker-compose.yml`?** Yes. This was outside the original plan, added so the app can be run, and checked, against Postgres locally.
+- **Output:**
+  - **API image:** `backend/Dockerfile`, Python 3.12 slim, non-root. Its start script runs `alembic upgrade head`, then uvicorn on `$PORT`.
+  - **Hosting config:** a Render Blueprint (`render.yaml`) for the API and Postgres, and `frontend/vercel.json`.
+  - **Compose stack:** `docker-compose.yml` runs Postgres, the API and the web app, with `frontend/Dockerfile` for the web image.
+  - **Docs:** `docs/DEPLOYMENT.md` lists every value to set, `docs/DEMO_SCRIPT.md` is the walkthrough for the video, and the README is rewritten.
+- **Test-first:** the Postgres URL handling started as failing tests, committed before the code.
+
+### Decisions the AI made, for review
+
+| Decision | Reasoning |
+|---|---|
+| `postgres://` and `postgresql://` URLs are rewritten to `postgresql+psycopg://` in the settings | Render hands out the plain form, which SQLAlchemy would open with psycopg2, a driver we don't install. With the rewrite, the provider's connection string works as given. |
+| Migrations run in the container's start script, not as a separate release step | That's what the plan says (ARCHITECTURE §9), and with one instance there's no race. DEPLOYMENT.md asks that migrations stay backward compatible, since they run before the new version takes traffic. |
+| The seed is run from a laptop against the database's external URL | Render's free plan has no shell or one-off jobs. The seed loads 10,000 employees in one transaction, and running it again does nothing without `--reset`. |
+| `SESSION_SECRET` is generated by Render; the HR email and hash are prompted for | No secret is in the repository. The only values you type are the two that identify the HR Manager. |
+| Render `virginia` and Vercel `iad1` | Every API call goes browser → Vercel → Render, so keeping the two in one region keeps that extra hop short. |
+| Compose reads `backend/.env` with `format: raw` | Compose otherwise expands `$` in values and mangles the bcrypt hash. `docker compose config` warned about it, and with `format: raw` the hash came through unchanged. |
+| The web image takes `API_ORIGIN` as a build argument | Next.js fixes the rewrite target when it builds, so it has to be known at build time. On Vercel this means redeploying after changing it, which DEPLOYMENT.md says. |
+
+### Corrections during the phase
+
+- **A commit subject was rejected** by the commit-message hook for starting with a capital letter after `chore:`, and was reworded.
+- **Compose mangled the password hash** (see the table above). It was caught by validating the Compose file, before anyone tried to sign in.
+
+### How the output was verified
+
+- **Checks:** backend ruff, mypy (strict) and pytest pass. Frontend lint, typecheck and 62 Vitest tests pass. `docker compose config`, `render.yaml` and the start script all parse.
+- **On Postgres 16, in a local container:**
+  - **Migrations and seed:** `alembic upgrade head` and `python -m app.seed` ran using a plain `postgresql://` URL, the form Render hands out. The seed loaded 10,000 employees in 3.6 s.
+  - **Timings:** `scripts/time_endpoints.py` ran against it, and every budgeted endpoint stayed under 300 ms p95 (results in [PERFORMANCE.md](PERFORMANCE.md#on-postgres)).
+  - **In the browser:** the app ran against it and the demo journey was walked through. Ravi Kumar's promotion to L4 at +12% previewed as ₹1,12,000 below the L4 minimum, saved as pending from 1 Jan 2027, and appeared under recent changes. The demo script's figures come from this run.

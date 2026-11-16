@@ -79,11 +79,12 @@ Every other commit leaves lint, type checks and tests green.
 
 ## 2. Branches and pull requests
 
-- Branch from an up-to-date `main`, one branch per piece of work, named `<type>/<short-description>`: `feat/domain`, `fix/fx-rounding`, `docs/housekeeping`.
-- **Never commit directly to `main`.** The `no-commit-to-branch` hook blocks it.
+- **`dev` is the integration branch; `main` is the release branch.** Branch from an up-to-date `dev`, one branch per piece of work, named `<type>/<short-description>`: `feat/seed`, `fix/fx-rounding`, `docs/housekeeping`. Pull requests target `dev`. The reviewer merges `dev` into `main` when a milestone is complete.
+- Start a new branch only after the previous pull request is merged, so every pull request targets `dev` directly. Stacked pull requests aren't retargeted automatically unless their base branch is deleted after merging, which is how Phases 2 and 3 once landed on feature branches instead of the mainline.
+- **Never commit directly to `main` or `dev`.** The `no-commit-to-branch` hook blocks both.
 - Open a pull request that is ready for review (not a draft), with a description of what changed, how it was verified, and anything the reviewer should know.
 - **Never force-push** or rewrite history that has been pushed. Fix mistakes with a new commit.
-- Only the reviewer merges into `main`.
+- Only the reviewer merges into `dev` and `main`.
 
 ## 3. Checks that enforce this
 

@@ -1,0 +1,115 @@
+# Performance
+
+**Budget** (REQUIREMENTS §6, ARCHITECTURE §6): p95 under **300 ms** for the list and insight endpoints, with 10,000 employees and their compensation history.
+
+**Result: every budgeted endpoint is within it.** The directory and profile endpoints answer in 7–40 ms (p95). Company-wide insight endpoints are at about 240–290 ms, so they're the ones to watch; filtered ones are well under 100 ms.
+
+## How it was measured
+
+```bash
+cd backend
+alembic upgrade head
+python -m app.seed
+python scripts/time_endpoints.py --runs 30
+```
+
+- **Data:** the full seed (10,000 employees, 26,776 compensation versions, 32,249 components), as of 12 Nov 2026.
+- **What's timed:** requests go through the whole app in-process (routing, the session check, validation, the database, the domain calculations and serialisation), but not over a network. The numbers are server time. Each endpoint gets 3 warm-up requests, then 30 timed ones.
+- **Environment:** SQLite 3.49 on an Apple M4 laptop, Python 3.12, measured 15 Nov 2026. The same run on Postgres is [below](#on-postgres). These results show the design meets the budget at this scale; they aren't a production benchmark.
+
+## Results
+
+| Endpoint | p50 (ms) | p95 (ms) | max (ms) | Within 300 ms |
+|---|---:|---:|---:|:---:|
+| Directory, first page | 14 | 15 | 16 | yes |
+| Directory, India + Engineering | 11 | 11 | 30 | yes |
+| Directory, sorted by total pay (USD) | 23 | 25 | 35 | yes |
+| Directory, below band | 22 | 40 | 45 | yes |
+| Directory, name search | 11 | 14 | 16 | yes |
+| Profile | 10 | 11 | 11 | yes |
+| Compensation history | 3 | 8 | 10 | yes |
+| Insights summary | 257 | 288 | 313 | yes |
+| Breakdown by country | 224 | 241 | 244 | yes |
+| Breakdown by department | 233 | 252 | 270 | yes |
+| Breakdown by level | 230 | 264 | 365 | yes |
+| Band distribution | 228 | 265 | 309 | yes |
+| Summary, India in INR | 72 | 96 | 106 | yes |
+| Breakdown, India by department in INR | 67 | 89 | 103 | yes |
+| Pay distribution | 218 | 241 | 251 | yes |
+| Pay distribution, India in INR | 66 | 89 | 99 | yes |
+| Exceptions, below band | 228 | 245 | 248 | yes |
+| Exceptions, due soon | 229 | 248 | 274 | yes |
+| Recent changes | 6 | 7 | 25 | yes |
+| CSV export, all employees (not in the budget) | 248 | 266 | 271 | n/a |
+
+A filtered insight only reads the matching people, so a one-country view (India, about a quarter of the company) answers in under 100 ms. The company-wide summary is the slowest at 288 ms p95, up from 239 ms. Since the Insights filters were added it counts joiners and leavers from the same directory query as everything else, so they respect the filters, and that query now reads leavers too. It's the first endpoint to optimise if the budget tightens (see below).
+
+### On Postgres
+
+The same script against Postgres 16 (the `postgres:16-alpine` image, in Docker on the same laptop), measured 15 Nov 2026. Postgres is reached over a local TCP connection, so each query pays a small round trip that in-process SQLite doesn't.
+
+| Endpoint | p50 (ms) | p95 (ms) | max (ms) | Within 300 ms |
+|---|---:|---:|---:|:---:|
+| Directory, first page | 54 | 57 | 91 | yes |
+| Directory, India + Engineering | 24 | 28 | 51 | yes |
+| Directory, sorted by total pay (USD) | 53 | 55 | 57 | yes |
+| Directory, below band | 47 | 50 | 70 | yes |
+| Directory, name search | 16 | 17 | 21 | yes |
+| Profile | 18 | 19 | 20 | yes |
+| Compensation history | 5 | 5 | 5 | yes |
+| Insights summary | 274 | 293 | 321 | yes |
+| Breakdown by country | 249 | 272 | 378 | yes |
+| Breakdown by department | 248 | 265 | 269 | yes |
+| Breakdown by level | 249 | 269 | 332 | yes |
+| Band distribution | 244 | 259 | 264 | yes |
+| Summary, India in INR | 73 | 92 | 104 | yes |
+| Breakdown, India by department in INR | 70 | 88 | 88 | yes |
+| Pay distribution | 245 | 265 | 265 | yes |
+| Pay distribution, India in INR | 70 | 90 | 93 | yes |
+| Exceptions, below band | 259 | 275 | 278 | yes |
+| Exceptions, due soon | 256 | 280 | 290 | yes |
+| Recent changes | 12 | 14 | 33 | yes |
+| CSV export, all employees (not in the budget) | 277 | 297 | 299 | n/a |
+
+Every budgeted endpoint is still within 300 ms p95. The directory is slower than on SQLite (up to 57 ms) but well inside the budget, and the insights are within about 10–30 ms of SQLite, since most of their time is Python working through the rows. The company-wide summary (293 ms) remains the endpoint closest to the limit. On Render the database runs on a separate host, so expect a few more milliseconds per query. That hasn't been measured yet.
+
+Loading the seed into Postgres took 3.6 s.
+
+## What makes it fast
+
+| Technique | Where |
+|---|---|
+| Server-side paging (max 100 rows), sorting and filtering, all in one indexed SQL query | `EmployeeRepository.search` |
+| Each version stores its local-currency totals, so no query unpacks components | `compensation_version.fixed_cash_minor` / `target_variable_minor` / `ttc_minor` |
+| Indexes on the "version in force" lookup, role, country, status and name, plus a partial unique index for open versions | ARCHITECTURE §4 |
+| Band position is filtered in SQL (`base < band × FTE`, no division), and shown via the domain | `_Directory.band_position` in `repositories/employees.py` |
+| Read-only rows are selected as plain columns, not ORM objects | directory query |
+| One FX rate set per request, not one per row | `DirectoryService` |
+
+`EXPLAIN QUERY PLAN` on the directory query shows every join using an index or primary key. The full 10,000-row read takes about **50 ms** of SQL and fetching.
+
+## What was changed to meet the budget
+
+The first measurement put every insight endpoint at about **290 ms p95**, with two over the budget (300 and 314 ms). Profiling one full load:
+
+| Cost | Before | After |
+|---|---:|---:|
+| SQL and fetching 10,000 rows | ~115 ms (building 19,000 ORM objects) | ~50 ms (plain columns) |
+| Rows into records | ~75 ms | included above |
+| A new `FxRates` table for every row | ~45 ms | 0 (one per request) |
+
+That brought the insight endpoints to about 230–260 ms p95.
+
+## Why the insights cost more, and what's next if they grow
+
+Insights compute band position, USD amounts and medians **at read time** for every current employee, by design: FX rates and bands change, so stored values would go stale (ARCHITECTURE §4). SQLite also has no percentile function, so medians are computed in the domain. That gives the same answers on SQLite and Postgres. The cost is roughly linear in headcount: about 220 ms for 10,000 people, of which ~50 ms is SQL and the rest is Python working through the rows.
+
+If headcount grows well beyond 10,000, or the budget tightens, the next steps in order would be:
+
+1. **Load the people once per request** for screens that call several insight endpoints (Overview calls summary and exceptions), or cache the result for a given `as_of` until the next write.
+2. **Push the simple aggregates into SQL** (headcount, totals, band counts with `GROUP BY`), and keep only medians in Python.
+3. **On Postgres, use `percentile_cont`** for medians, if dropping SQLite parity becomes acceptable.
+
+## Seeding
+
+The full seed loads in about **1.5 s** on SQLite, against a 15 s target. The first version took 13.6 s, because SQLAlchemy's ORM bulk insert with `RETURNING` issued one statement per row; batched Core inserts fixed it (see the Phase 4 notes in [AI_USAGE.md](AI_USAGE.md)).

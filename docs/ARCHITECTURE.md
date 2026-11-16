@@ -72,9 +72,9 @@ backend/app/
 
 ```mermaid
 erDiagram
-    COUNTRY ||--o{ EMPLOYEE : employs
+    COUNTRY ||--o{ COMPENSATION_VERSION : "paid in"
     DEPARTMENT ||--o{ ROLE : contains
-    ROLE ||--o{ EMPLOYEE : holds
+    ROLE ||--o{ COMPENSATION_VERSION : "held as"
     ROLE ||--o{ ROLE_DEFAULT_COMPONENT : "default structure"
     ROLE ||--o{ PAY_BAND : "banded per country"
     COUNTRY ||--o{ PAY_BAND : ""
@@ -89,10 +89,10 @@ erDiagram
 | `fx_rate` | `currency`, `usd_per_unit` (decimal), `rate_set`, `is_active` | Fixed, versioned reference rates. Exactly one rate set is active, and all USD figures use it. |
 | `department` | `id`, `name` | |
 | `role` | `id`, `department_id`, `family`, `level` (1–5), `title` | e.g. Software Engineer, L3. |
-| `role_default_component` | `role_id`, `type`, `basis`, `value`, `frequency` | Template copied onto new hires (E3, E4). |
+| `role_default_component` | `role_id`, `type` (bonus or commission), `percent`, `label` | Template copied onto new hires (E3, E4). A percentage of base, because a role spans every currency. |
 | `pay_band` | `role_id`, `country_code`, `min/mid/max_minor` | Unique per (role, country). |
-| `employee` | `id`, `employee_code` (unique), `name`, `email` (unique), `country_code`, `role_id`, `employment_type`, `fte`, `status`, `hire_date`, `termination_date` | |
-| `compensation_version` | `id`, `employee_id`, `effective_from`, `effective_to` (nullable), `reason`, `currency`, `base_annual_minor`, **derived (local currency only):** `fixed_cash_minor`, `target_variable_minor`, `ttc_minor` | Immutable once written. |
+| `employee` | `id`, `employee_code` (unique), `name`, `email` (unique), `employment_type`, `fte`, `status`, `hire_date`, `termination_date` | No role or country: those belong to the version in force (see below). |
+| `compensation_version` | `id`, `employee_id`, `effective_from`, `effective_to` (nullable), `reason`, `role_id`, `country_code`, `currency`, `base_annual_minor`, **derived (local currency only):** `fixed_cash_minor`, `target_variable_minor`, `ttc_minor`, `note`, `created_at` | Immutable once written, except `effective_to`, set when a later version supersedes it. |
 | `compensation_component` | `version_id`, `type`, `basis`, `value`, `frequency`, `payout_date` | |
 
 ### Design decisions
@@ -105,9 +105,11 @@ erDiagram
   Both are indexed joins over ~10k current versions, well within the latency budget. The calculation logic still lives in the domain layer; repositories supply the inputs.
 - **Money is stored as integers** (`*_minor` = cents/paise), with the currency on the row. A `Money` value object in the domain prevents adding different currencies.
 - **"Current" version** = `effective_from <= as_of AND (effective_to IS NULL OR effective_to > as_of)`.
+- **Role and country live on the version, not the employee.** An employee's role, country, band and currency are those of the version in force on `as_of` (or, before their start date, of their first version). A promotion or transfer dated 1 Jan 2027 therefore applies on that day with no scheduled job, the same read-time rule as USD and compa-ratio. An employee with no version at all (E13) has no role or country until a package is recorded.
+- **Decimals are stored exactly.** FX rates, FTE and percentages use an `ExactDecimal` column type: `NUMERIC` on Postgres, text on SQLite (which would otherwise round them through floating point).
 
 ### Indexes
-`employee(country_code)`, `employee(role_id)`, `employee(status)`, `employee(name)`, unique `employee(employee_code)`, unique `employee(email)`, `compensation_version(employee_id, effective_from)`, unique `pay_band(role_id, country_code)`.
+`employee(status)`, `employee(name)`, `employee(employment_type)`, unique `employee(employee_code)`, unique `employee(email)`, `compensation_version(employee_id, effective_from)`, `compensation_version(role_id)`, `compensation_version(country_code)`, partial unique `compensation_version(employee_id) WHERE effective_to IS NULL` (one open version per employee), unique `pay_band(role_id, country_code)`, `fx_rate(is_active, currency)`.
 
 ## 5. API design
 
@@ -115,22 +117,29 @@ REST, JSON, `/api/v1` prefix; OpenAPI docs at `/docs`.
 
 | Method & path | Purpose |
 |---|---|
-| `GET /employees` | Paginated list. `page`, `page_size` (≤ 100), `sort`, `q` (name/code search), filters: `country`, `department`, `role`, `level`, `employment_type`, `status`, `band_position`. Returns `{items, total, page, page_size}`. |
-| `GET /employees/{id}` | Profile + current package + band comparison. |
-| `POST /employees` | Hire: creates the employee + first version (role defaults applied, overridable). |
-| `PATCH /employees/{id}` | Update non-compensation details. |
-| `POST /employees/{id}/terminate` | Ends employment: sets status + termination date, and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
-| `GET /employees/{id}/compensation` | Full version history. |
-| `POST /employees/{id}/compensation` | New version (raise, promotion, correction) with `effective_from` + `reason`. |
-| `GET /employees/export.csv` | CSV of the current filtered list (S4). |
-| `GET /insights/summary` | Headcount, total TTC (USD), fixed/variable mix, bonus-eligibility rate. |
-| `GET /insights/breakdown` | `group_by=country|department|level`, optional filters → count, min/median/mean/max. |
-| `GET /insights/band-distribution` | Below / in / above band counts by group. |
-| `GET /insights/exceptions` | Out of band, missing package, pending future changes. |
-| `GET /reference/{countries,departments,roles,pay-bands}` | Dropdown data. |
-| `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management (see §5a). Every other endpoint requires a session. |
+| `GET /employees` | Paginated list. `page`, `page_size` (≤ 100), `sort` (`name`, `employee_code`, `base`, `total_pay_usd`, `compa_ratio`, `last_change`), `order`, `q` (name/code prefix), filters: `country`, `department`, `role`, `level`, `employment_type`, `status` (default: active and on leave), `band_position`, `as_of`. Returns `{items, total, page, page_size}`. |
+| `GET /employees/export.csv` | CSV of the same filtered list, all pages (S4). Amounts in major units; formula-like text neutralised. |
+| `GET /employees/{id}` | Profile: current package with components, totals in local currency and USD, variable share, band comparison with the band range, peers in role and country (count, median FTE-equivalent base), pending changes, one-time payments. Accepts `as_of`. |
+| `POST /employees` | Hire: creates the employee + first version (role defaults unless `components` are given). Returns the profile, `201` + `Location`. |
+| `PATCH /employees/{id}` | Update non-compensation details (name, email, employment type, FTE, active / on leave). |
+| `POST /employees/{id}/terminate` | Ends employment: records the last day worked (which may be in the future; status is derived from it at read time) and keeps the record and salary history. There is deliberately no `DELETE`: salary history is a record HR must keep. |
+| `GET /employees/{id}/compensation` | Full version history, newest first, each with its state (`current`, `pending`, `past`, `superseded`) and raise % in local currency. |
+| `POST /employees/{id}/compensation` | New version (raise, promotion, transfer, correction) with `effective_from` + `reason`. Returns the new history entry, `201`. |
+| `POST /employees/{id}/compensation/preview` | Dry run of the above: before → after, band position against the new role's band, raise %, USD, whether it takes effect later. Runs the same checks as a save; writes nothing (decision Q2). |
+| `GET /insights/summary` | Headcount, joiners and leavers this quarter, total and median pay, % paid within band, bonus-eligibility rate, variable share, employees without a package. Takes the shared insight filters and `currency` (below). |
+| `GET /insights/breakdown` | `group_by=country\|department\|level` (contractors grouped separately) → headcount, min/median/mean/max, variable share. Takes the shared insight filters and `currency`. |
+| `GET /insights/pay-distribution` | A histogram of total target pay: equal brackets with round widths (1, 2, 2.5 or 5 × a power of ten), about 12 of them. Takes the shared insight filters and `currency`. |
+| `GET /insights/band-distribution` | Below / in / above band counts and % in band, by group. Contractors left out. Takes the shared insight filters. |
+| `GET /insights/exceptions` | Counts for below band, above band, changes due in the next 60 days and missing packages (the sidebar badge is their total), plus a page of one `type`, largest gap first. |
+| `GET /insights/recent-changes` | The latest recorded changes (not hires), newest first, with raise % and whether pending. `limit` (default 5). |
+| `GET /reference/{countries,departments,roles,pay-bands}` | Dropdown data; roles include their default components. |
+| `POST /auth/login` · `POST /auth/logout` · `GET /auth/me` | Session management (see §5a). Every other endpoint except `GET /health` requires a session. |
 
-**Errors** use one consistent shape, `{ "error": { "code": "OVERLAPPING_VERSION", "message": "...", "details": {...} } }`. Domain exceptions map to 400/404/409/422 in a single handler, so routers have no try/except clutter. A missing, expired, or tampered session returns **401** (`UNAUTHENTICATED`), and the UI responds by redirecting to `/login`.
+**Insight filters:** summary, breakdown, pay-distribution and band-distribution take `country`, `department`, `level` and `employment_type`, each single-valued. `currency` is `usd` (the default: USD at reference rates) or `local`. `local` needs a `country` and reports amounts in that country's currency as stored, with no conversion. Without a country it's rejected with `422 LOCAL_CURRENCY_NEEDS_COUNTRY`.
+
+Money is returned as `{"amount_minor": 240000000, "currency": "INR"}`. Decimals (FTE, percentages, compa-ratio) are fixed-precision strings such as `"0.89"`, so clients never parse floats and SQLite and Postgres return the same text.
+
+**Errors** use one consistent shape, `{ "error": { "code": "OVERLAPPING_VERSION", "message": "...", "details": {...} } }`. Domain exceptions map to 409 (a clash with stored data: overlapping versions, duplicates) or 422 (a broken rule) in a single handler, so routers have no try/except clutter. A missing, expired, or tampered session returns **401** (`UNAUTHENTICATED`), and the UI responds by redirecting to `/login`.
 
 **Pagination:** offset/limit. At 10k rows offset cost is negligible, and keyset pagination would complicate arbitrary sorting for no benefit.
 
@@ -157,12 +166,12 @@ sequenceDiagram
 |---|---|
 | Credentials | `HR_ADMIN_EMAIL` and `HR_ADMIN_PASSWORD_HASH` (bcrypt) as backend env vars. No users table. The plain password is never stored, and a helper script generates the hash. |
 | Session | Signed JWT (`SESSION_SECRET`, HS256, 8-hour expiry) in an **HttpOnly, Secure, SameSite=Lax** cookie. JavaScript can't read it, which limits XSS impact. |
-| Enforcement | **FastAPI is the real gate:** a single `require_session` dependency on every router except `/auth/login`. Next.js `middleware.ts` only checks that the cookie exists and redirects to `/login`, for UX. |
+| Enforcement | **FastAPI is the real gate:** a single `require_session` dependency on every router except `/auth/login` and `/health` (the hosting platform's health check can't send a cookie, and health exposes no salary data). Next.js `middleware.ts` only checks that the cookie exists and redirects to `/login`, for UX. |
 | Same-origin | Because Next.js proxies `/api/*`, the cookie is first-party, with no cross-site cookie or CORS configuration. |
 | Failure handling | Generic "invalid email or password" message (no account enumeration); constant-time comparison. |
 | Not included (yet) | Rate limiting / lockout, password reset, multiple users, roles. Noted as next steps. |
 
-Tests cover the happy path, wrong password, missing or expired or tampered cookie → 401, and that every protected router has the dependency attached (a single test walks the route table).
+Tests cover the happy path, wrong password, missing or expired or tampered cookie → 401, and a single test walks the route table (from the OpenAPI schema) and sends every route except login and health a request without a session, expecting 401. The app refuses to start without a complete login configuration.
 
 ## 6. Performance at 10k employees
 
@@ -173,7 +182,7 @@ Tests cover the happy path, wrong password, missing or expired or tampered cooki
 | Insight aggregates | One SQL query per widget: current versions joined to the active `fx_rate` (and `pay_band` for band widgets), then `GROUP BY`. Stored local totals mean no component unpacking. |
 | Median / percentiles | SQLite has no `percentile_cont`. To stay portable, the repository fetches the sorted USD-converted TTC for the filtered group (≤ 10k numbers, ~80 KB) and the domain computes percentiles. This is fast, exact, and the same on both databases. |
 | N+1 queries | Explicit `selectinload` for components; list endpoints use a single joined query. |
-| Seeding | Bulk inserts in batches inside one transaction; target < 15 s for 10k employees + ~30k versions. |
+| Seeding | Generated in pure Python (every version through the domain's `plan_revision`), then batched Core inserts inside one transaction, with ids read back via `RETURNING` so Postgres sequences stay in step. Target < 15 s; measured ~1.5 s on SQLite for 10k employees + ~26.8k versions. (The ORM bulk path issued one statement per row and took 13.6 s.) |
 | Frontend | TanStack Query caching, debounced search (300 ms), `placeholderData: keepPreviousData` to avoid table flicker while paging. |
 
 **Budget:** p95 < 300 ms for list and insight endpoints on seeded data. Verified with a small timing script during development; numbers recorded in `docs/PERFORMANCE.md`.
@@ -183,25 +192,26 @@ Tests cover the happy path, wrong password, missing or expired or tampered cooki
 ```
 frontend/
 ├── app/                      # Next.js App Router
-│   ├── layout.tsx            # root layout, providers (TanStack Query)
-│   ├── login/                # public login page
-│   ├── (app)/                # authenticated shell: sidebar + header
-│   │   ├── page.tsx          # Overview (insights + exceptions summary)
-│   │   ├── employees/        # directory, [id] profile, [id]/revise, new (hire)
-│   │   ├── insights/
-│   │   └── exceptions/
+│   ├── layout.tsx            # fonts (Geist, Geist Mono) and providers
+│   ├── providers.tsx         # TanStack Query client, toasts, tooltips
+│   ├── login/                # public sign-in page
+│   └── (app)/                # signed-in shell: sidebar + header with ⌘K search
+│       ├── page.tsx          # Overview
+│       ├── employees/        # directory, new (hire), [id] profile, [id]/revise
+│       ├── exceptions/
+│       └── insights/
 ├── components/
 │   ├── ui/                   # shadcn/ui components (owned, generated into repo)
-│   └── ...                   # shared: Money, BandIndicator, EmptyState, ErrorState
-├── features/                 # feature modules: employees, insights, exceptions
-├── lib/                      # api client + query hooks, formatting, Zod schemas
-├── middleware.ts             # redirect to /login when no session cookie
-└── next.config.ts            # rewrites /api/* → FastAPI
+│   └── ...                   # shared: app shell, band status, band gauge, states
+├── features/                 # per-screen pieces: employees, profile, revise, insights
+├── lib/                      # API client, query hooks, formatting, URL filters, Zod schemas, types
+├── middleware.ts             # redirect to /login when there's no session cookie
+└── next.config.ts            # rewrites /api/* → FastAPI (API_ORIGIN)
 ```
 
-**Client vs. server components:** pages are thin server components that render the shell; interactive parts (data table, forms, charts) are client components that fetch through TanStack Query. FastAPI stays the single source of business logic, and Next.js doesn't duplicate it.
+**Client components, server logic.** The signed-in pages are client components that fetch through TanStack Query; the session cookie is HttpOnly, so only the browser can send it. FastAPI stays the single source of business logic: the revise page's live preview calls the server's dry-run endpoint rather than recomputing pay in TypeScript, and band position, USD and totals always come from the API. The frontend only formats, validates forms for fast feedback (mirroring the server's rules in Zod), and keeps view state in the URL.
 
-Pages: **Overview** · **Directory** → **Employee profile** (package, band gauge, history timeline) → **Revise compensation** (full page at `/employees/[id]/revise`: form + live preview side by side, then an inline confirm step) · **Insights** · **Exceptions**. URL search params hold the filters, so views can be bookmarked and shared.
+Pages: **Overview** · **Directory** → **Employee profile** (package, band gauge, history timeline) → **Revise compensation** (full page at `/employees/[id]/revise`: form + live preview side by side, then an inline confirm step) · **Insights** · **Exceptions** · **Add employee** (`/employees/new`). URL search params hold the directory filters, sort and page, the Exceptions tab and the Insights grouping, so views can be bookmarked and shared.
 
 ## 8. Testing strategy
 
@@ -210,7 +220,7 @@ Pages: **Overview** · **Directory** → **Employee profile** (package, band gau
 | **Domain unit** | Calculations, Money, validation, overlap rules, every edge case E1–E25 | Pure pytest, no DB, table-driven (`parametrize`) | Most tests |
 | **Service / repository** | Transactions, filters, aggregates, current-version selection | pytest + in-memory SQLite, fixture factories, pinned clock | Some |
 | **API** | Status codes, contracts, error shape | `TestClient` against in-memory DB | Some |
-| **Frontend** | Form validation, table/filter wiring, money formatting | Vitest + RTL with mocked API hooks | Few, focused |
+| **Frontend** | Form validation (Zod rules and the login form), filter ↔ URL wiring, money formatting, band-status rendering, the revise request and confirmation sentence | Vitest + RTL, with `fetch` and Next.js navigation mocked | Few, focused |
 
 Principles: **fast** (whole backend suite in seconds), **deterministic** (fixed clock, fixed FX, seeded random), **readable** (Arrange-Act-Assert, names describe behaviour, e.g. `test_part_time_employee_is_compared_to_band_at_fte`). Domain logic is developed **test-first**, and commits show test → implementation pairs.
 
@@ -220,9 +230,13 @@ Principles: **fast** (whole backend suite in seconds), **deterministic** (fixed 
 GitHub main ──▶ Render: API (Docker) ──▶ Render Postgres
            └──▶ Vercel: Next.js (rewrites /api/* → Render API via API_ORIGIN)
 ```
-- Alembic migrations run on API start-up; the seed runs once via a one-off command.
-- The browser never calls the API origin directly (same-origin via rewrites), so CORS stays closed.
-- Config through environment variables (`DATABASE_URL`, `API_ORIGIN`, `HR_ADMIN_EMAIL`, `HR_ADMIN_PASSWORD_HASH`, `SESSION_SECRET`); `.env.example` committed with placeholders only, and real values live in the hosting provider's secret store.
+- The API ships as a Docker image (`backend/Dockerfile`, Python 3.12 slim, non-root). Its start script runs `alembic upgrade head`, then uvicorn on `$PORT`. Render builds it from the `render.yaml` Blueprint, which also creates the Postgres database and wires its connection string into `DATABASE_URL`.
+- Postgres connects through psycopg 3. Hosted `postgres://` and `postgresql://` URLs are rewritten to `postgresql+psycopg://` in the settings, so the provider's string works as given.
+- The seed runs once, as a one-off `python -m app.seed`. On Render's free plan, which has no shell, it's run from a laptop against the database's external URL.
+- The browser never calls the API origin directly (same-origin via rewrites), so CORS stays closed. `API_ORIGIN` is fixed into the rewrite when Next.js builds, so changing it means redeploying the web app.
+- Config through environment variables (`DATABASE_URL`, `API_ORIGIN`, `HR_ADMIN_EMAIL`, `HR_ADMIN_PASSWORD_HASH`, `SESSION_SECRET`); `.env.example` committed with placeholders only, and real values live in the hosting provider's secret store. Render generates `SESSION_SECRET`.
+- `docker-compose.yml` runs the same API image with Postgres and the web app locally, for checking against Postgres before a deploy.
+- Step-by-step setup, the values to set, and the free-plan limits are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## 10. Key trade-offs
 

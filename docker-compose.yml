@@ -1,0 +1,49 @@
+# The whole app on your machine, against Postgres as in production:
+#
+#   docker compose up --build                      # http://localhost:3000
+#   docker compose run --rm api python -m app.seed # once, in another terminal
+#
+# The HR login comes from backend/.env (HR_ADMIN_EMAIL, HR_ADMIN_PASSWORD_HASH,
+# SESSION_SECRET); see docs/SETUP_GUIDE.md. Its DATABASE_URL is overridden here.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: salary
+      POSTGRES_PASSWORD: salary # local only; never reuse it
+      POSTGRES_DB: salary
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salary -d salary"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    env_file:
+      - path: backend/.env
+        format: raw # read as written: the bcrypt hash is full of `$`
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://salary:salary@db:5432/salary
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_ORIGIN: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  db-data:

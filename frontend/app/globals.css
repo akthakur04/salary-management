@@ -1,0 +1,129 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * Design tokens from PRODUCT_DESIGN.md §3, as shadcn CSS variables.
+ * One light theme only: there is deliberately no dark mode.
+ */
+:root {
+  --radius: 0.625rem;
+
+  --background: #f8f7f4; /* paper */
+  --foreground: #16181d; /* ink */
+  --card: #ffffff; /* surface */
+  --card-foreground: #16181d;
+  --popover: #ffffff;
+  --popover-foreground: #16181d;
+  --primary: #3b46a0; /* Insight Indigo */
+  --primary-foreground: #ffffff;
+  --primary-strong: #2c3580; /* hover, text on primary tint */
+  --primary-tint: #eef0fa;
+  --primary-soft: #8e98f0; /* secondary data series */
+  --secondary: #efede7;
+  --secondary-foreground: #16181d;
+  --muted: #efede7;
+  --muted-foreground: #5c6370;
+  --subtle-foreground: #3a3f48;
+  --accent: #efede7;
+  --accent-foreground: #16181d;
+  --destructive: #b2433a; /* rose: validation and destructive actions only */
+  --border: #e5e3dd; /* hairline */
+  --input: #d9d6ce;
+  --ring: #3b46a0;
+
+  /* Status: colour + icon + text, never colour alone. Below band is amber, never red. */
+  --sage: #4f7d63;
+  --sage-tint: #e7f0ea;
+  --sage-text: #335a44;
+  --amber: #b07a1e;
+  --amber-tint: #fbf1de;
+  --amber-text: #7a4e06; /* 4.5:1 on the tint for small labels */
+  --amber-surface: #fffbf2;
+  --amber-line: #f1e3c4;
+  --violet: #6b5fa8; /* above band: informational */
+  --violet-tint: #eeecf7;
+  --violet-text: #4f4590;
+  --rose: #b2433a;
+  --rose-tint: #fbeae8;
+  --rose-text: #8f2f27;
+
+  --chart-1: #3b46a0;
+  --chart-2: #8e98f0;
+  --chart-3: #4f7d63;
+  --chart-4: #b07a1e;
+  --chart-5: #6b5fa8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-tint: var(--primary-tint);
+  --color-primary-soft: var(--primary-soft);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-sage: var(--sage);
+  --color-sage-tint: var(--sage-tint);
+  --color-sage-text: var(--sage-text);
+  --color-amber: var(--amber);
+  --color-amber-tint: var(--amber-tint);
+  --color-amber-text: var(--amber-text);
+  --color-amber-surface: var(--amber-surface);
+  --color-amber-line: var(--amber-line);
+  --color-violet: var(--violet);
+  --color-violet-tint: var(--violet-tint);
+  --color-violet-text: var(--violet-text);
+  --color-rose: var(--rose);
+  --color-rose-tint: var(--rose-tint);
+  --color-rose-text: var(--rose-text);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.2);
+  --radius-2xl: calc(var(--radius) * 1.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  a {
+    @apply text-primary hover:text-primary-strong;
+  }
+}
+
+/* Every amount: Geist Mono with tabular figures, so columns of money line up. */
+@utility amount {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}

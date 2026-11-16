@@ -1,0 +1,368 @@
+"""Employees: lookups for the services, and the directory query.
+
+The directory joins each employee to the compensation version in force on
+`as_of`, and through it to the role, country, current pay band and active FX
+rate. Role and country come from that version (or, for someone not yet started,
+from their first version), so future-dated promotions and transfers apply on
+their own date.
+"""
+
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
+from enum import StrEnum
+from typing import Any
+
+from sqlalchemy import (
+    ColumnElement,
+    Row,
+    Select,
+    UnaryExpression,
+    and_,
+    case,
+    func,
+    literal,
+    null,
+    or_,
+    select,
+)
+from sqlalchemy.orm import InstrumentedAttribute, Session, aliased
+
+from app.domain.bands import BandPosition
+from app.domain.bands import PayBand as DomainPayBand
+from app.domain.employment import EmploymentStatus, EmploymentType, status_on
+from app.domain.identity import EmployeeIdentity
+from app.domain.money import Money
+from app.domain.versions import ChangeReason
+from app.models import CompensationVersion, Country, Department, Employee, FxRate, PayBand, Role
+from app.repositories.pagination import Page, validate_page
+
+CURRENT_EMPLOYEES = (EmploymentStatus.ACTIVE, EmploymentStatus.ON_LEAVE)
+
+
+class EmployeeSort(StrEnum):
+    NAME = "name"
+    EMPLOYEE_CODE = "employee_code"
+    BASE = "base"
+    TOTAL_PAY_USD = "total_pay_usd"
+    COMPA_RATIO = "compa_ratio"
+    LAST_CHANGE = "last_change"
+
+
+@dataclass(frozen=True, slots=True)
+class EmployeeQuery:
+    """Directory filters. Terminated employees are left out unless asked for (E11)."""
+
+    q: str | None = None
+    country_code: str | None = None
+    department_id: int | None = None
+    role_id: int | None = None
+    level: int | None = None
+    employment_types: tuple[EmploymentType, ...] = ()
+    statuses: tuple[EmploymentStatus, ...] = CURRENT_EMPLOYEES
+    band_position: BandPosition | None = None
+    sort: EmployeeSort = EmployeeSort.NAME
+    descending: bool = False
+    page: int = 1
+    page_size: int = 25
+
+    def __post_init__(self) -> None:
+        validate_page(self.page, self.page_size)
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentPackage:
+    version_id: int
+    effective_from: date
+    reason: ChangeReason
+    currency: str
+    base_annual_minor: int
+    fixed_cash_minor: int
+    target_variable_minor: int
+    ttc_minor: int
+
+
+@dataclass(frozen=True, slots=True)
+class EmployeeRecord:
+    """One directory row: the inputs the domain needs to compare pay and convert to USD."""
+
+    id: int
+    employee_code: str
+    name: str
+    email: str
+    employment_type: EmploymentType
+    fte: Decimal
+    status: EmploymentStatus
+    hire_date: date
+    termination_date: date | None
+    role_id: int | None
+    role_title: str | None
+    level: int | None
+    department: str | None
+    country_code: str | None
+    country_name: str | None
+    current: CurrentPackage | None
+    band: DomainPayBand | None
+    usd_per_unit: Decimal | None
+
+
+class EmployeeRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, employee_id: int) -> Employee | None:
+        return self._session.get(Employee, employee_id)
+
+    def get_one(self, employee_id: int) -> Employee:
+        return self._session.get_one(Employee, employee_id)
+
+    def add(self, employee: Employee) -> int:
+        self._session.add(employee)
+        self._session.flush()
+        return employee.id
+
+    def identities_matching(self, identity: EmployeeIdentity) -> list[EmployeeIdentity]:
+        """Existing employees that share the code or email (stored normalised)."""
+        rows = self._session.execute(
+            select(Employee.employee_code, Employee.email).where(
+                or_(
+                    Employee.employee_code == identity.employee_code,
+                    Employee.email == identity.email,
+                )
+            )
+        )
+        return [EmployeeIdentity(row.employee_code, row.email) for row in rows]
+
+    def search(self, query: EmployeeQuery, as_of: date) -> Page[EmployeeRecord]:
+        directory = _Directory(as_of)
+        filtered = directory.filtered(query)
+        total = self._session.scalar(select(func.count()).select_from(filtered.subquery()))
+        rows = self._session.execute(
+            filtered.order_by(*directory.ordering(query))
+            .limit(query.page_size)
+            .offset((query.page - 1) * query.page_size)
+        )
+        return Page(
+            items=tuple(directory.to_record(row) for row in rows),
+            total=total or 0,
+            page=query.page,
+            page_size=query.page_size,
+        )
+
+    def list_all(self, query: EmployeeQuery, as_of: date) -> list[EmployeeRecord]:
+        """Every matching row, in the query's order (for CSV export)."""
+        directory = _Directory(as_of)
+        rows = self._session.execute(directory.filtered(query).order_by(*directory.ordering(query)))
+        return [directory.to_record(row) for row in rows]
+
+    def peer_bases(self, role_id: int, country_code: str, as_of: date) -> list[tuple[int, Decimal]]:
+        """Base and FTE of current, banded employees in the role and country on `as_of`."""
+        directory = _Directory(as_of)
+        query = EmployeeQuery(
+            role_id=role_id,
+            country_code=country_code,
+            employment_types=(EmploymentType.FULL_TIME, EmploymentType.PART_TIME),
+        )
+        statement = (
+            directory.filtered(query)
+            .with_only_columns(directory.current.base_annual_minor, Employee.fte)
+            .where(directory.current.id.is_not(None))
+        )
+        return [(base, fte) for base, fte in self._session.execute(statement)]
+
+
+class _Directory:
+    """Builds the directory query for one `as_of` date."""
+
+    def __init__(self, as_of: date) -> None:
+        self.as_of = as_of
+        self.current = aliased(CompensationVersion, name="current_version")
+        self.shown = aliased(CompensationVersion, name="shown_version")
+        first = aliased(CompensationVersion, name="first_version")
+        current = self.current
+
+        first_version_id = (
+            select(first.id)
+            .where(first.employee_id == Employee.id)
+            .order_by(first.effective_from, first.id)
+            .limit(1)
+            .correlate(Employee)
+            .scalar_subquery()
+        )
+        self.base: Select[*tuple[Any, ...]] = (
+            select(
+                # Plain columns, not ORM entities: the rows are only read, and building
+                # 10,000 identity-mapped objects would dominate the insight endpoints.
+                Employee.id,
+                Employee.employee_code,
+                Employee.name,
+                Employee.email,
+                Employee.employment_type,
+                Employee.fte,
+                Employee.status,
+                Employee.hire_date,
+                Employee.termination_date,
+                current.id.label("version_id"),
+                current.effective_from,
+                current.reason,
+                current.currency,
+                current.base_annual_minor,
+                current.fixed_cash_minor,
+                current.target_variable_minor,
+                current.ttc_minor,
+                Role.title,
+                Role.level,
+                Department.name.label("department"),
+                Country.code.label("country_code"),
+                Country.name.label("country_name"),
+                Country.currency.label("band_currency"),
+                PayBand.min_minor,
+                PayBand.mid_minor,
+                PayBand.max_minor,
+                FxRate.usd_per_unit,
+                self.shown.role_id,
+            )
+            .select_from(Employee)
+            .outerjoin(
+                current,
+                and_(
+                    current.employee_id == Employee.id,
+                    current.effective_from <= as_of,
+                    or_(current.effective_to.is_(None), current.effective_to > as_of),
+                ),
+            )
+            .outerjoin(self.shown, self.shown.id == func.coalesce(current.id, first_version_id))
+            .outerjoin(Role, Role.id == self.shown.role_id)
+            .outerjoin(Department, Department.id == Role.department_id)
+            .outerjoin(Country, Country.code == self.shown.country_code)
+            .outerjoin(
+                PayBand,
+                and_(
+                    PayBand.role_id == self.shown.role_id,
+                    PayBand.country_code == self.shown.country_code,
+                ),
+            )
+            .outerjoin(FxRate, and_(FxRate.currency == current.currency, FxRate.is_active))
+        )
+
+    def status(self) -> ColumnElement[str]:
+        """Same rule as the domain's status_on: terminated from the day after the last day."""
+        return case(
+            (
+                and_(
+                    Employee.termination_date.is_not(None), Employee.termination_date < self.as_of
+                ),
+                literal(EmploymentStatus.TERMINATED.value),
+            ),
+            else_=Employee.status,
+        )
+
+    def band_position(self) -> ColumnElement[str | None]:
+        """Same rule as the domain's compare_to_band, in SQL so it can filter and count.
+
+        Comparing base with `band * FTE` is the FTE-equivalent comparison without dividing.
+        """
+        current = self.current
+        return case(
+            (current.id.is_(None), null()),
+            (
+                or_(Employee.employment_type == EmploymentType.CONTRACTOR, PayBand.id.is_(None)),
+                literal(BandPosition.NO_BAND.value),
+            ),
+            (
+                current.base_annual_minor < PayBand.min_minor * Employee.fte,
+                literal(BandPosition.BELOW.value),
+            ),
+            (
+                current.base_annual_minor > PayBand.max_minor * Employee.fte,
+                literal(BandPosition.ABOVE.value),
+            ),
+            else_=literal(BandPosition.IN_BAND.value),
+        )
+
+    def filtered(self, query: EmployeeQuery) -> Select[*tuple[Any, ...]]:
+        conditions: list[ColumnElement[bool]] = [
+            self.status().in_([status.value for status in query.statuses])
+        ]
+        if query.q:
+            conditions.append(
+                or_(
+                    Employee.name.istartswith(query.q, autoescape=True),
+                    Employee.employee_code.istartswith(query.q, autoescape=True),
+                )
+            )
+        if query.country_code:
+            conditions.append(self.shown.country_code == query.country_code)
+        if query.department_id is not None:
+            conditions.append(Role.department_id == query.department_id)
+        if query.role_id is not None:
+            conditions.append(self.shown.role_id == query.role_id)
+        if query.level is not None:
+            conditions.append(Role.level == query.level)
+        if query.employment_types:
+            conditions.append(Employee.employment_type.in_(query.employment_types))
+        if query.band_position is not None:
+            conditions.append(self.band_position() == query.band_position.value)
+        return self.base.where(*conditions)
+
+    def ordering(
+        self, query: EmployeeQuery
+    ) -> list[UnaryExpression[Any] | InstrumentedAttribute[int]]:
+        current = self.current
+        sort_columns: dict[EmployeeSort, ColumnElement[Any] | InstrumentedAttribute[Any]] = {
+            EmployeeSort.NAME: Employee.name,
+            EmployeeSort.EMPLOYEE_CODE: Employee.employee_code,
+            EmployeeSort.BASE: current.base_annual_minor,
+            EmployeeSort.TOTAL_PAY_USD: current.ttc_minor * FxRate.usd_per_unit,
+            EmployeeSort.COMPA_RATIO: (current.base_annual_minor * 1.0)
+            / (PayBand.mid_minor * Employee.fte),
+            EmployeeSort.LAST_CHANGE: current.effective_from,
+        }
+        column = sort_columns[query.sort]
+        direction = column.desc() if query.descending else column.asc()
+        return [direction.nulls_last(), Employee.id]
+
+    def to_record(self, row: Row[Any]) -> EmployeeRecord:
+        band = (
+            DomainPayBand(
+                Money(row.min_minor, row.band_currency),
+                Money(row.mid_minor, row.band_currency),
+                Money(row.max_minor, row.band_currency),
+            )
+            if row.min_minor is not None
+            else None
+        )
+        package = (
+            CurrentPackage(
+                version_id=row.version_id,
+                effective_from=row.effective_from,
+                reason=row.reason,
+                currency=row.currency,
+                base_annual_minor=row.base_annual_minor,
+                fixed_cash_minor=row.fixed_cash_minor,
+                target_variable_minor=row.target_variable_minor,
+                ttc_minor=row.ttc_minor,
+            )
+            if row.version_id is not None
+            else None
+        )
+        return EmployeeRecord(
+            id=row.id,
+            employee_code=row.employee_code,
+            name=row.name,
+            email=row.email,
+            employment_type=row.employment_type,
+            fte=row.fte,
+            status=status_on(row.status, row.termination_date, self.as_of),
+            hire_date=row.hire_date,
+            termination_date=row.termination_date,
+            role_id=row.role_id,
+            role_title=row.title,
+            level=row.level,
+            department=row.department,
+            country_code=row.country_code,
+            country_name=row.country_name,
+            current=package,
+            band=band,
+            usd_per_unit=row.usd_per_unit,
+        )
