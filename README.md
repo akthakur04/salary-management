@@ -104,7 +104,7 @@ The API (Docker) and Postgres run on Render, from [render.yaml](render.yaml). Th
 | [UI_DESIGN.md](docs/UI_DESIGN.md) | Screens and design decisions; sources in [docs/design/](docs/design/) |
 | [PERFORMANCE.md](docs/PERFORMANCE.md) | Endpoint timings against the 300 ms budget, and what made them fast |
 | [AI_USAGE.md](docs/AI_USAGE.md) | How AI was used, and where its output was corrected |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Commit message rules, branches, PRs, git hooks and CI checks |
+| [Collaboration.md](Collaboration.md) | Commit message rules, branches, PRs, git hooks and CI checks |
 
 ## Known limitations
 
